@@ -1,0 +1,21 @@
+# Python virtual environment
+.venv/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# VSCode settings (optional)
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment config
+.env
+*.env
+
+# 開發用測試腳本
+test_*.py
