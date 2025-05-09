@@ -5,6 +5,7 @@ description = ""
 requires-python = ">=3.11"
 dependencies = [
     "agno>=1.4.5",
+    "alembic>=1.15.2",
     "annotated-types==0.7.0",
     "anyio==4.9.0",
     "certifi==2025.4.26",
@@ -28,6 +29,7 @@ dependencies = [
     "mdurl==0.1.2",
     "openai==1.77.0",
     "orjson==3.10.18",
+    "psycopg2>=2.9.10",
     "pydantic==2.11.4",
     "pydantic-core==2.33.2",
     "pydantic-extra-types==2.10.4",
