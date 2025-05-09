@@ -6,7 +6,8 @@ from src.domain.models.game import GameState, Tool
 _fake_game_db = {
     "abc123": GameState(
         id="abc123",
-        trust_score=50,
+        trust_score_player=50,
+        trust_score_agent=50,
         tools_used=[]
     )
 }
@@ -18,7 +19,12 @@ class GameRepository:
             return _fake_game_db[game_id]
         else:
             # 如果找不到就初始化一個新的
-            game = GameState(id=game_id, trust_score=50, tools_used=[])
+            game = GameState(
+                id=game_id,
+                trust_score_player=50,
+                trust_score_agent=50,
+                tools_used=[]
+            )
             _fake_game_db[game_id] = game
             return game
 
