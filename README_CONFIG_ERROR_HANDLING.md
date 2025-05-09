@@ -123,7 +123,8 @@ openai_key = settings.openai_api_key
 google_key = settings.google_api_key
 
 # 使用資料庫設定
-db_url = settings.database_url
+db_url_sync = settings.database_url_sync
+db_url_async = settings.database_url_async
 
 # 獲取整個配置字典（用於調試）
 config_dict = settings.to_dict()

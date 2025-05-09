@@ -36,7 +36,8 @@ class Settings:
     google_key = settings.google_api_key
     
     # 使用資料庫設定
-    db_url = settings.database_url
+    db_url_sync = settings.database_url_sync
+    db_url_async = settings.database_url_async
     ```
     """
     # 應用設定
@@ -51,7 +52,8 @@ class Settings:
     google_api_key: str = field(default_factory=lambda: os.getenv("GOOGLE_API_KEY", ""))
     
     # 資料庫設定
-    database_url: str = field(default_factory=lambda: os.getenv("DATABASE_URL", ""))
+    database_url_sync: str = field(default_factory=lambda: os.getenv("DATABASE_URL_SYNC", ""))
+    database_url_async: str = field(default_factory=lambda: os.getenv("DATABASE_URL_ASYNC", ""))
     
     @property
     def is_development(self) -> bool:
@@ -98,7 +100,8 @@ class Settings:
                 "google": bool(self.google_api_key),
             },
             "database": {
-                "url": bool(self.database_url),  # 只顯示是否設定，不顯示實際 URL
+                "url_sync": bool(self.database_url_sync),  # 只顯示是否設定，不顯示實際 URL
+                "url_async": bool(self.database_url_async),  # 只顯示是否設定，不顯示實際 URL
             }
         }
 
