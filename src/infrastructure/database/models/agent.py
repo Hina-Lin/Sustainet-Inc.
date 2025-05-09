@@ -2,15 +2,13 @@
 """
 Agent 全配置表 - 存儲 Agent 基本訊息與其配置參數
 """
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, JSON, Float, func, text
-from .base import Base
+from sqlalchemy import Column, Integer, String, Text, Boolean, JSON, Float, text
+from .base import Base, TimeStampMixin
 
-class Agent(Base):
+class Agent(Base, TimeStampMixin):
     """
     Agent 表，結合基本資訊與配置參數於同一張表
     """
-    __tablename__ = 'agents'
-
     # 主鍵
     id = Column(Integer, primary_key=True, autoincrement=True)
 
@@ -41,9 +39,7 @@ class Agent(Base):
     # 模型參數
     temperature = Column(Float, nullable=True)
 
-    # 時間戳
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
-    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    # 時間戳已由 TimeStampMixin 提供
 
     def __repr__(self):
         return (
