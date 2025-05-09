@@ -6,7 +6,7 @@ from src.infrastructure.database.game_repo import GameRepository
 
 def use_tool_service(request: UseToolRequest) -> UseToolResponse:
     game = GameRepository.get(request.game_id)
-    updated_game = apply_tool_effect(game, request.tool_name)
+    updated_game = apply_tool_effect(game, request.tool_name, request.user)
     GameRepository.save(updated_game)
     
     return UseToolResponse(
