@@ -10,6 +10,7 @@ def use_tool_service(request: UseToolRequest) -> UseToolResponse:
     GameRepository.save(updated_game)
     
     return UseToolResponse(
-        trust_score=updated_game.trust_score,
+        trust_score_player=updated_game.trust_score_player,
+        trust_score_agent=updated_game.trust_score_agent,
         message=f"Used {request.tool_name}."
     )

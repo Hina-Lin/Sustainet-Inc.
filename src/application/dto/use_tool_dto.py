@@ -9,5 +9,6 @@ class UseToolRequest(BaseModel):
 
 
 class UseToolResponse(BaseModel):
-    trust_score: int
+    trust_score_player: int
+    trust_score_agent: int
     message: str
