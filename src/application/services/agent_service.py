@@ -5,7 +5,7 @@ Agent 相關的服務層邏輯。
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from src.application.dto.agent_dto import (
     AgentCreateRequest,
@@ -25,21 +25,21 @@ class AgentService:
     ```python
     # 透過依賴注入獲取服務
     @router.get("/agents")
-    async def list_agents(service: AgentService = Depends(get_agent_service)):
-        return await service.list_agents()
+    def list_agents(service: AgentService = Depends(get_agent_service)):
+        return service.list_agents()
     ```
     """
-    def __init__(self, db: Optional[AsyncSession] = None):
+    def __init__(self, db: Optional[Session] = None):
         """
         初始化服務。
         
         Args:
-            db: 異步數據庫會話
+            db: 數據庫會話
         """
         self.db = db
         self.repo = AgentRepository()
     
-    async def create_agent(self, request: AgentCreateRequest) -> AgentResponse:
+    def create_agent(self, request: AgentCreateRequest) -> AgentResponse:
         """
         建立新的 Agent。
         
@@ -49,7 +49,7 @@ class AgentService:
         Returns:
             新建立的 Agent 響應 DTO
         """
-        agent: Agent = await self.repo.create_agent(
+        agent: Agent = self.repo.create_agent(
             agent_name=request.agent_name,
             provider=request.provider,
             model_name=request.model_name,
@@ -79,7 +79,7 @@ class AgentService:
             updated_at=updated_at.isoformat()
         )
     
-    async def get_agent(self, agent_id: int) -> AgentResponse:
+    def get_agent(self, agent_id: int) -> AgentResponse:
         """
         獲取 Agent。
         
@@ -92,7 +92,7 @@ class AgentService:
         Raises:
             ResourceNotFoundError: 如果找不到 Agent
         """
-        agent: Agent = await self.repo.get_by_id(agent_id, db=self.db)
+        agent: Agent = self.repo.get_by_id(agent_id, db=self.db)
         
         # 明確的類型標註
         created_at: datetime = agent.created_at
@@ -110,7 +110,7 @@ class AgentService:
             updated_at=updated_at.isoformat()
         )
     
-    async def get_agent_by_name(self, agent_name: str) -> Optional[AgentResponse]:
+    def get_agent_by_name(self, agent_name: str) -> Optional[AgentResponse]:
         """
         根據名稱獲取 Agent。
         
@@ -120,7 +120,7 @@ class AgentService:
         Returns:
             Agent 響應 DTO，如果未找到則返回 None
         """
-        agent: Optional[Agent] = await self.repo.get_by_name(agent_name, db=self.db)
+        agent: Optional[Agent] = self.repo.get_by_name(agent_name, db=self.db)
         
         if not agent:
             return None
@@ -141,14 +141,14 @@ class AgentService:
             updated_at=updated_at.isoformat()
         )
     
-    async def list_agents(self) -> AgentListResponse:
+    def list_agents(self) -> AgentListResponse:
         """
         獲取所有 Agent 列表。
         
         Returns:
             Agent 列表響應 DTO
         """
-        agents: List[Agent] = await self.repo.get_all(db=self.db)
+        agents: List[Agent] = self.repo.get_all(db=self.db)
         
         agent_responses: List[AgentResponse] = []
         for agent in agents:
@@ -175,7 +175,7 @@ class AgentService:
             total=len(agent_responses)
         )
     
-    async def update_agent(self, agent_id: int, request: AgentUpdateRequest) -> AgentResponse:
+    def update_agent(self, agent_id: int, request: AgentUpdateRequest) -> AgentResponse:
         """
         更新 Agent。
         
@@ -197,10 +197,10 @@ class AgentService:
                 
         if not update_data:
             # 如果沒有需要更新的資料，直接返回現有 Agent
-            return await self.get_agent(agent_id)
+            return self.get_agent(agent_id)
                 
         # 更新 Agent
-        agent: Agent = await self.repo.update(agent_id, update_data, db=self.db)
+        agent: Agent = self.repo.update(agent_id, update_data, db=self.db)
         
         # 明確的類型標註
         created_at: datetime = agent.created_at
@@ -219,14 +219,5 @@ class AgentService:
             updated_at=updated_at.isoformat()
         )
     
-    async def delete_agent(self, agent_id: int) -> None:
-        """
-        刪除 Agent。
-        
-        Args:
-            agent_id: Agent ID
-            
-        Raises:
-            ResourceNotFoundError: 如果找不到 Agent
-        """
-        await self.repo.delete(agent_id, db=self.db)
+    def delete_agent(self, agent_id: int) -> None:
+        self.repo.delete(agent_id, db=self.db)

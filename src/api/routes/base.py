@@ -6,12 +6,12 @@ API 基礎路由設定模組。
 - 統一的服務層依賴注入
 - 基礎路由類別
 """
-from typing import Callable, Type, TypeVar, Generic, Dict, Any, Optional, Awaitable
+from typing import Callable, Type, TypeVar, Generic, Dict, Any, Optional
 from functools import lru_cache
 
 from fastapi import Depends
 from fastapi.routing import APIRouter
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from src.infrastructure.database.session import get_db
 
@@ -37,8 +37,8 @@ class BaseRouter(Generic[ServiceType]):
     
     # 註冊路由
     @agent_router.router.get("", response_model=AgentListResponse)
-    async def list_agents(service: AgentService = Depends(agent_router.get_service)):
-        return await service.list_agents()
+    def list_agents(service: AgentService = Depends(agent_router.get_service)):
+        return service.list_agents()
     ```
     """
     def __init__(
@@ -63,19 +63,19 @@ class BaseRouter(Generic[ServiceType]):
         self.service_class = service_class
         self.router = APIRouter(prefix=prefix, tags=tags)
     
-    async def get_service(self, db: AsyncSession = Depends(get_db)) -> ServiceType:
+    def get_service(self, db: Session = Depends(get_db)) -> ServiceType:
         """
         獲取服務實例的依賴函數。
         
         用法:
         ```python
         @router.get("")
-        async def list_items(service: MyService = Depends(get_service)):
-            return await service.list_items()
+        def list_items(service: MyService = Depends(get_service)):
+            return service.list_items()
         ```
         
         Args:
-            db: 異步數據庫會話
+            db: 數據庫會話
             
         Returns:
             服務實例
@@ -87,7 +87,7 @@ class BaseRouter(Generic[ServiceType]):
 # 全局服務依賴字典
 _service_instances: Dict[Type, Any] = {}
 
-def inject_service(service_class: Type[ServiceType]) -> Callable[[AsyncSession], ServiceType]:
+def inject_service(service_class: Type[ServiceType]) -> Callable[[Session], ServiceType]:
     """
     服務依賴注入裝飾器。
     用於在 API 路由中注入服務實例。
@@ -95,8 +95,8 @@ def inject_service(service_class: Type[ServiceType]) -> Callable[[AsyncSession],
     用法:
     ```python
     @router.get("")
-    async def list_agents(service = Depends(inject_service(AgentService))):
-        return await service.list_agents()
+    def list_agents(service = Depends(inject_service(AgentService))):
+        return service.list_agents()
     ```
     
     Args:
@@ -105,9 +105,8 @@ def inject_service(service_class: Type[ServiceType]) -> Callable[[AsyncSession],
     Returns:
         依賴函數，返回服務實例
     """
-    async def get_service_instance(db: AsyncSession = Depends(get_db)) -> ServiceType:
+    def get_service_instance(db: Session = Depends(get_db)) -> ServiceType:
         """依賴函數，返回服務實例"""
-        # 非同步環境中，建議每次創建新實例而非重用
         return service_class(db=db)
     
     return get_service_instance
@@ -117,7 +116,7 @@ def inject_service(service_class: Type[ServiceType]) -> Callable[[AsyncSession],
 # 導入服務類別型別
 from src.application.services.agent_service import AgentService
 
-async def get_agent_service(db: AsyncSession = Depends(get_db)) -> AgentService:
+def get_agent_service(db: Session = Depends(get_db)) -> AgentService:
     """獲取 Agent 服務實例"""
     return AgentService(db=db)
 

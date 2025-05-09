@@ -53,3 +53,8 @@ dependencies = [
     "websockets==15.0.1",
 ]
 
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.21.0",
+]
+

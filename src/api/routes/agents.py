@@ -18,7 +18,7 @@ router = APIRouter(prefix="/agents",
                    tags=["agents"])
 
 @router.post("", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
-async def create_agent(
+def create_agent(
     request: AgentCreateRequest,
     service: AgentService = Depends(get_agent_service)
 ):
@@ -32,19 +32,19 @@ async def create_agent(
     - **instruction**: Agent 的指令設定
     - **tools**: Agent 的工具設定
     """
-    return await service.create_agent(request)
+    return service.create_agent(request)
 
 @router.get("", response_model=AgentListResponse)
-async def list_agents(
+def list_agents(
     service: AgentService = Depends(get_agent_service)
 ):
     """
     獲取所有 Agent 列表。
     """
-    return await service.list_agents()
+    return service.list_agents()
 
 @router.get("/{agent_id}", response_model=AgentResponse)
-async def get_agent(
+def get_agent(
     agent_id: int = Path(..., description="Agent ID"),
     service: AgentService = Depends(get_agent_service)
 ):
@@ -54,7 +54,7 @@ async def get_agent(
     - **agent_id**: Agent ID
     """
     try:
-        return await service.get_agent(agent_id)
+        return service.get_agent(agent_id)
     except ResourceNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -62,7 +62,7 @@ async def get_agent(
         )
 
 @router.get("/by-name/{agent_name}", response_model=AgentResponse)
-async def get_agent_by_name(
+def get_agent_by_name(
     agent_name: str = Path(..., description="Agent 名稱"),
     service: AgentService = Depends(get_agent_service)
 ):
@@ -71,7 +71,7 @@ async def get_agent_by_name(
     
     - **agent_name**: Agent 名稱
     """
-    agent = await service.get_agent_by_name(agent_name)
+    agent = service.get_agent_by_name(agent_name)
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -80,7 +80,7 @@ async def get_agent_by_name(
     return agent
 
 @router.put("/{agent_id}", response_model=AgentResponse)
-async def update_agent(
+def update_agent(
     request: AgentUpdateRequest,
     agent_id: int = Path(..., description="Agent ID"),
     service: AgentService = Depends(get_agent_service)
@@ -91,7 +91,7 @@ async def update_agent(
     - **agent_id**: Agent ID
     """
     try:
-        return await service.update_agent(agent_id, request)
+        return service.update_agent(agent_id, request)
     except ResourceNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -99,7 +99,7 @@ async def update_agent(
         )
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_agent(
+def delete_agent(
     agent_id: int = Path(..., description="Agent ID"),
     service: AgentService = Depends(get_agent_service)
 ):
@@ -109,7 +109,7 @@ async def delete_agent(
     - **agent_id**: Agent ID
     """
     try:
-        await service.delete_agent(agent_id)
+        service.delete_agent(agent_id)
     except ResourceNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

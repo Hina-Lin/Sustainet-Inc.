@@ -66,11 +66,6 @@ class Settings:
         return self.app_env.lower() == "production"
     
     @property
-    def is_testing(self) -> bool:
-        """檢查是否為測試環境"""
-        return self.app_env.lower() == "testing"
-    
-    @property
     def log_level(self) -> int:
         """取得日誌級別"""
         levels = {
@@ -93,7 +88,6 @@ class Settings:
                 "log_file_path": self.app_log_file_path,
                 "is_development": self.is_development,
                 "is_production": self.is_production,
-                "is_testing": self.is_testing,
             },
             "api_keys": {
                 "openai": bool(self.openai_api_key),
