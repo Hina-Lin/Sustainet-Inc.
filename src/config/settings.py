@@ -49,6 +49,7 @@ class Settings:
     
     # API 密鑰
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+    anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     google_api_key: str = field(default_factory=lambda: os.getenv("GOOGLE_API_KEY", ""))
     
     # 資料庫設定
@@ -91,6 +92,7 @@ class Settings:
             },
             "api_keys": {
                 "openai": bool(self.openai_api_key),
+                "anthropic": bool(self.anthropic_api_key),
                 "google": bool(self.google_api_key),
             },
             "database": {

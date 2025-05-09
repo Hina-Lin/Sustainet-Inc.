@@ -2,14 +2,17 @@
 
 import uvicorn
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from src.api.routes import tools, agents
 from src.api.middleware.error_handler import setup_exception_handlers
 from src.config import settings
 from src.utils.logger import logger
+from src.infrastructure.database.session import get_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,13 +49,24 @@ setup_exception_handlers(app)
 app.include_router(tools.router, prefix="/api")
 app.include_router(agents.router, prefix="/api")
 
-# 簡單的健康檢查端點
+# 健康檢查端點
 @app.get("/health")
-async def health_check():
+def health_check(db: Session = Depends(get_db)):
+    try:
+        # 測試資料庫連線
+        db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        logger.error(f"資料庫連線檢查失敗: {str(e)}")
+        db_status = "disconnected"
+    
     return {
         "status": "ok",
         "environment": settings.app_env,
-        "version": app.version
+        "version": app.version,
+        "database": {
+            "status": db_status
+        }
     }
 
 if __name__ == "__main__":
