@@ -10,7 +10,7 @@ from src.config import settings
 
 # Create synchronous engine
 engine = create_engine(
-    settings.database_url_sync,   # e.g. "postgresql://user:pwd@host:6543/db?sslmode=require"
+    settings.database_url_sync,  
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,

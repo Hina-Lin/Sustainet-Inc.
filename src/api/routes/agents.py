@@ -2,7 +2,9 @@
 Agent 相關的 API 路由。
 提供 Agent CRUD 操作的 HTTP 端點。
 """
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Path, HTTPException, status
+from pydantic import BaseModel
 
 from src.application.dto.agent_dto import (
     AgentCreateRequest,
@@ -11,11 +13,26 @@ from src.application.dto.agent_dto import (
     AgentListResponse
 )
 from src.api.routes.base import get_agent_service
-from src.utils.exceptions import ResourceNotFoundError
+from src.utils.exceptions import ResourceNotFoundError, BusinessLogicError
 from src.application.services.agent_service import AgentService
+from src.infrastructure.agno.agents.agent_factory import AgentFactoryService
+from src.infrastructure.database.agent_repo import AgentRepository
 
 router = APIRouter(prefix="/agents", 
                    tags=["agents"])
+
+# 依賴注入
+def get_agent_factory() -> AgentFactoryService:
+    """獲取 AgentFactory 服務實例"""
+    return AgentFactoryService(AgentRepository())
+
+class TestAgentRequest(BaseModel):
+    """測試 Agent 的請求 DTO"""
+    input_text: str
+
+class TestAgentResponse(BaseModel):
+    """測試 Agent 的響應 DTO"""
+    result: str
 
 @router.post("", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
 def create_agent(
@@ -116,3 +133,37 @@ def delete_agent(
             detail=str(e)
         )
     return None
+
+@router.post("/test", response_model=TestAgentResponse)
+def test_agent(
+    request: TestAgentRequest,
+    agent_factory: AgentFactoryService = Depends(get_agent_factory)
+):
+    """
+    測試預設的測試 Agent。
+    
+    - **input_text**: 輸入文本
+    """
+    try:
+        result = agent_factory.run_agent_by_name(
+            session_id="test_session",
+            agent_name="testagent",
+            variables={"scenario": "測試情境，請使用工具"},
+            input_text=request.input_text
+        )
+        return TestAgentResponse(result=result)
+    except ResourceNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except BusinessLogicError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"測試 Agent 時發生錯誤: {str(e)}"
+        )
