@@ -1,5 +1,4 @@
 # src/main.py
-
 import uvicorn
 
 from fastapi import FastAPI, Depends
