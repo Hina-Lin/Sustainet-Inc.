@@ -18,5 +18,8 @@ Thumbs.db
 .env
 *.env
 
-# 開發用測試腳本
-test_*.py
+
+# 打包產物
+build/
+dist/
+*.egg-info/

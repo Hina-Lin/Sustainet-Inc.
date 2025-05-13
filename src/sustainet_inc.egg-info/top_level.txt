@@ -1,7 +1,0 @@
-api
-application
-config
-domain
-infrastructure
-tests
-utils
