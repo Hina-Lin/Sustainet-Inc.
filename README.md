@@ -5,14 +5,16 @@ Sustainet Inc. 是一款以永續議題為主題的策略模擬遊戲，探索�
 📦 技術架構總覽
 
 本專案採用 Clean Architecture，並結合 Agno 作為 Agent 管理框架。
-
+```
 API (FastAPI)
 └── Application Layer (Use Cases, DTOs)
     └── Domain Layer (Entities, Logic)
-        └── Infrastructure Layer (Agno Agent, DB, Prompt, Tools)
+        └── Infrastructure Layer (外部依賴)
+```
 
 📁 專案目錄結構
 
+```
 src/
 ├── api/                        # FastAPI endpoints
 │   ├── routes/                 # 所有路由
@@ -24,13 +26,13 @@ src/
 │   ├── models/                 # Entity / ValueObject
 │   └── logic/                  # 規則計算器、得分邏輯、工具影響
 ├── infrastructure/             # GPT/Agno 整合、資料庫、新聞、儲存
-│   ├── agents/                 # 使用 Agno 創建的 Agent 工廠與實體
 │   ├── database/               # 模擬資料庫與 Repository
 │   ├── news/                   # 新聞載入器（假新聞拼接來源）
 ├── utils/                      # 公用工具（日誌、異常處理等）
 ├── config/                     # 設定管理與環境變數加載
 ├── tests/                      # 單元與整合測試
 └── main.py                     # FastAPI app 入口
+```
 
 📚 遊戲流程概覽
 
@@ -63,13 +65,13 @@ pip install uv
 
 # 建立虛擬環境並安裝依賴
 uv venv
-uv pip install -r requirements.txt
+uv pip install -r requirements.txt(uv sync)
 ```
 
 如使用 uv 設定依賴：
 
 ```bash
-uv pip freeze > requirements.txt
+uv add (這個會自動將套件更新到.lock以及.toml)
 ```
 
 🚀 啟動方式

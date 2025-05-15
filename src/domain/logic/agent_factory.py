@@ -22,7 +22,7 @@ import agno.tools as tools_pkg
 TOOL_CLASSES: Dict[str, type] = {}
 
 # 添加額外的工具目錄
-extra_tools_dir = Path.cwd() / "src" / "infrastructure" / "agno" / "tools"
+extra_tools_dir = Path.cwd() / "src" / "domain" / "logic" / "tools"
 if extra_tools_dir.is_dir():
     logger.info(f"添加額外工具目錄: {extra_tools_dir}")
     tools_pkg.__path__.append(str(extra_tools_dir))
@@ -41,7 +41,7 @@ if settings.app_env == "development":
         logger.warning("無法載入默認 CalculatorTools")
 
     try:
-        from src.infrastructure.agno.tools.placeholder import Placeholder
+        from src.domain.logic.tools.placeholder import Placeholder
         TOOL_CLASSES["Placeholder"] = Placeholder
         logger.debug("添加默認 Placeholder")
     except ImportError:
@@ -50,7 +50,7 @@ else:
     # 生產環境載入所有工具
     for _, mod_name, _ in pkgutil.iter_modules([str(extra_tools_dir)]):
         try:
-            module = importlib.import_module(f"src.infrastructure.agno.tools.{mod_name}")
+            module = importlib.import_module(f"src.domain.logic.tools.{mod_name}")
             logger.debug(f"成功載入工具模組: {mod_name}")
             
             for attr in dir(module):
@@ -64,7 +64,7 @@ else:
 
 logger.info(f"系統中可用的工具類列表: {', '.join(TOOL_CLASSES.keys())}")
 
-class AgentFactoryService:
+class AgentFactory:
     """
     Agent Factory 服務，負責創建和管理 Agent
     """
