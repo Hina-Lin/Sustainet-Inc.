@@ -15,16 +15,16 @@ from src.application.dto.agent_dto import (
 from src.api.routes.base import get_agent_service
 from src.utils.exceptions import ResourceNotFoundError, BusinessLogicError
 from src.application.services.agent_service import AgentService
-from src.infrastructure.agno.agents.agent_factory import AgentFactoryService
+from domain.logic.agent_factory import AgentFactory
 from src.infrastructure.database.agent_repo import AgentRepository
 
 router = APIRouter(prefix="/agents", 
                    tags=["agents"])
 
 # 依賴注入
-def get_agent_factory() -> AgentFactoryService:
+def get_agent_factory() -> AgentFactory:
     """獲取 AgentFactory 服務實例"""
-    return AgentFactoryService(AgentRepository())
+    return AgentFactory(AgentRepository())
 
 class TestAgentRequest(BaseModel):
     """測試 Agent 的請求 DTO"""
@@ -137,7 +137,7 @@ def delete_agent(
 @router.post("/test", response_model=TestAgentResponse)
 def test_agent(
     request: TestAgentRequest,
-    agent_factory: AgentFactoryService = Depends(get_agent_factory)
+    agent_factory: AgentFactory = Depends(get_agent_factory)
 ):
     """
     測試預設的測試 Agent。
