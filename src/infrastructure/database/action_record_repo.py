@@ -124,3 +124,74 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
             },
             db=db
         )
+
+    @with_session
+    def create_ai_action(
+        self,
+        session_id: str,
+        round_number: int,
+        actor: str,
+        platform: str,
+        content: str,
+        db: Optional[Session] = None
+    ) -> ActionRecord:
+        """
+        建立 AI 的行動記錄。
+
+        Args:
+            session_id: 遊戲識別碼
+            round_number: 回合數
+            actor: 行動者（"ai"）
+            platform: 發布的平台名稱
+            content: 行動內容
+            db: 資料庫 Session
+
+        Returns:
+            新創建的 ActionRecord 實體
+        """
+        return self.create(
+            {
+                "session_id": session_id,
+                "round_number": round_number,
+                "actor": actor,
+                "platform": platform,
+                "content": content,
+                "reach_count": None,
+                "trust_change": None,
+                "spread_change": None,
+                "effectiveness": None,
+                "simulated_comments": [],
+            },
+            db=db
+        )
+
+    @with_session
+    def update_effectiveness(
+        self,
+        action_id: int,
+        trust_change: int,
+        spread_change: int,
+        effectiveness: str,
+        db: Optional[Session] = None
+    ):
+        """
+        更新行動記錄的效果評估。
+
+        Args:
+            action_id: 行動記錄的 ID
+            trust_change: 信任值變化
+            spread_change: 傳播率變化
+            effectiveness: 效果評估（如 "Low", "Medium", "High"）
+            db: 資料庫 Session
+        """
+        action = db.query(ActionRecord).filter_by(id=action_id).first()
+        if not action:
+            raise ResourceNotFoundError(
+                message=f"ActionRecord with id={action_id} not found",
+                resource_type="action_record",
+                resource_id=action_id
+            )
+        action.trust_change = trust_change
+        action.spread_change = spread_change
+        action.effectiveness = effectiveness
+        db.commit()

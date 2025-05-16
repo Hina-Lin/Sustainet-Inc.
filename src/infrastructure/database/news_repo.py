@@ -104,3 +104,28 @@ class NewsRepository(BaseRepository[News]):
             },
             db=db
         )
+
+    @with_session
+    def get_random_news(
+        self,
+        db: Optional[Session] = None
+    ) -> News:
+        """
+        隨機取得一則新聞。
+
+        Args:
+            db: 資料庫 Session
+
+        Returns:
+            隨機選取的 News 實體
+        """
+        from sqlalchemy.sql import func
+        stmt = db.query(News).order_by(func.random()).limit(1)
+        result = stmt.first()
+        if not result:
+            raise ResourceNotFoundError(
+                message="No news available.",
+                resource_type="news",
+                resource_id="random"
+            )
+        return result

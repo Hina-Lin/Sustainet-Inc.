@@ -112,3 +112,91 @@ class PlatformStateRepository(BaseRepository[PlatformState]):
             },
             db=db
         )
+
+    @with_session
+    def get_states_by_session(
+        self,
+        session_id: str,
+        db: Optional[Session] = None
+    ) -> List[PlatformState]:
+        """
+        根據 session_id 取得所有平台狀態。
+
+        Args:
+            session_id: 遊戲識別碼
+            db: 可選的資料庫 Session
+
+        Returns:
+            該 session_id 下所有平台的狀態列表
+        """
+        return db.query(PlatformState).filter_by(session_id=session_id).all()
+
+    @with_session
+    def create_initial_states(
+        self,
+        session_id: str,
+        platforms: List[dict],
+        db: Optional[Session] = None
+    ):
+        """
+        建立初始平台狀態，信任值與傳播率皆為預設值。
+
+        Args:
+            session_id: 遊戲識別碼
+            platforms: 平台與受眾設定（JSON list）
+            db: 可選的資料庫 Session
+        """
+        for platform in platforms:
+            self.create(
+                {
+                    "session_id": session_id,
+                    "round_number": 1,
+                    "platform_name": platform["name"],
+                    "player_trust": 50,
+                    "ai_trust": 50,
+                    "spread_rate": 50,
+                },
+                db=db
+            )
+
+    @with_session
+    def update_platform_state(
+        self,
+        session_id: str,
+        round_number: int,
+        platform_name: str,
+        trust_change_ai: int,
+        spread_change: int,
+        db: Optional[Session] = None
+    ):
+        """
+        更新指定平台的 AI 信任值與傳播率。
+
+        Args:
+            session_id: 遊戲識別碼
+            round_number: 回合數
+            platform_name: 平台名稱
+            trust_change_ai: AI 信任值的變化量
+            spread_change: 傳播率的變化量
+            db: 可選的資料庫 Session
+
+        Raises:
+            ResourceNotFoundError: 如果找不到指定的 PlatformState
+        """
+        platform = db.query(PlatformState).filter_by(
+            session_id=session_id,
+            round_number=round_number,
+            platform_name=platform_name
+        ).first()
+
+        if not platform:
+            raise ResourceNotFoundError(
+                message=f"PlatformState not found for session={session_id}, round={round_number}, platform={platform_name}",
+                resource_type="platform_state",
+                resource_id=f"{session_id}-{round_number}-{platform_name}"
+            )
+
+        platform.ai_trust += trust_change_ai
+        platform.spread_rate += spread_change
+        db.commit()
+

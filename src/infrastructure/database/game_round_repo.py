@@ -99,3 +99,33 @@ class GameRoundRepository(BaseRepository[GameRound]):
             },
             db=db
         )
+
+    @with_session
+    def create_first_round(
+        self,
+        session_id: str,
+        round_number: int,
+        news_id: int,
+        db: Optional[Session] = None
+    ) -> GameRound:
+        """
+        建立第一回合的遊戲記錄。
+
+        Args:
+            session_id: 遊戲識別碼
+            round_number: 回合數（通常為 1）
+            news_id: 本回合所使用的新聞 ID
+            db: 資料庫 Session
+
+        Returns:
+            新創建的 GameRound 實體
+        """
+        return self.create(
+            {
+                "session_id": session_id,
+                "round_number": round_number,
+                "news_id": news_id,
+                "is_completed": False,
+            },
+            db=db
+        )
