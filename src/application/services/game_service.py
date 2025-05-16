@@ -5,6 +5,7 @@ Game 相關的服務層邏輯。
 
 from typing import List
 import random
+import uuid
 
 from src.application.dto.game_dto import GameStartResponse, PlatformStatus
 from src.infrastructure.database.game_setup_repo import GameSetupRepository
@@ -69,7 +70,7 @@ class GameService:
         platforms = [{"name": name, "audience": audience} for name, audience in zip(platform_names, audiences)]
 
         # 產生唯一 session_id
-        session_id = "game_" + str(random.randint(10000, 99999))
+        session_id = f"game_{uuid.uuid4().hex}"
 
         # 2. 建立 GameSetup
         self.setup_repo.create_game_setup(session_id=session_id, platforms=platforms)
@@ -85,7 +86,7 @@ class GameService:
         fake_content = self.agent.generate_fake_news(news)
 
         # 6. 建立 AI 的 ActionRecord
-        action = self.action_repo.create_ai_action(
+        action = self.action_repo.create_action_record(
             session_id=session_id,
             round_number=1,
             actor="ai",
@@ -100,7 +101,8 @@ class GameService:
             action_id=action.id,
             trust_change=trust_delta,
             spread_change=spread_delta,
-            effectiveness="Medium"
+            effectiveness="Medium",
+            reach_count=800
         )
 
         # 8. 更新 PlatformState

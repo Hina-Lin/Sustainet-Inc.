@@ -125,53 +125,15 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
             db=db
         )
 
-    @with_session
-    def create_ai_action(
-        self,
-        session_id: str,
-        round_number: int,
-        actor: str,
-        platform: str,
-        content: str,
-        db: Optional[Session] = None
-    ) -> ActionRecord:
-        """
-        建立 AI 的行動記錄。
-
-        Args:
-            session_id: 遊戲識別碼
-            round_number: 回合數
-            actor: 行動者（"ai"）
-            platform: 發布的平台名稱
-            content: 行動內容
-            db: 資料庫 Session
-
-        Returns:
-            新創建的 ActionRecord 實體
-        """
-        return self.create(
-            {
-                "session_id": session_id,
-                "round_number": round_number,
-                "actor": actor,
-                "platform": platform,
-                "content": content,
-                "reach_count": None,
-                "trust_change": None,
-                "spread_change": None,
-                "effectiveness": None,
-                "simulated_comments": [],
-            },
-            db=db
-        )
 
     @with_session
     def update_effectiveness(
         self,
         action_id: int,
-        trust_change: int,
-        spread_change: int,
-        effectiveness: str,
+        trust_change: Optional[int] = None,  # 設為可選
+        spread_change: Optional[int] = None,  # 設為可選
+        effectiveness: Optional[str] = None,  # 設為可選
+        reach_count: Optional[int] = None,  # 設為可選
         db: Optional[Session] = None
     ):
         """
@@ -182,6 +144,7 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
             trust_change: 信任值變化
             spread_change: 傳播率變化
             effectiveness: 效果評估（如 "Low", "Medium", "High"）
+            reach_count: 預估觸及人數
             db: 資料庫 Session
         """
         action = db.query(ActionRecord).filter_by(id=action_id).first()
@@ -191,7 +154,15 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
                 resource_type="action_record",
                 resource_id=action_id
             )
-        action.trust_change = trust_change
-        action.spread_change = spread_change
-        action.effectiveness = effectiveness
+
+        # 更新欄位（只有在提供值時才更新）
+        if trust_change is not None:
+            action.trust_change = trust_change
+        if spread_change is not None:
+            action.spread_change = spread_change
+        if effectiveness is not None:
+            action.effectiveness = effectiveness
+        if reach_count is not None:
+            action.reach_count = reach_count
+
         db.commit()

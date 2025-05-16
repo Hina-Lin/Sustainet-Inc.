@@ -5,7 +5,7 @@ from src.domain.models.game import GameState, Tool
 # 假的 in-memory 遊戲資料庫
 _fake_game_db = {
     "abc123": GameState(
-        id="abc123",
+        session_id="abc123",
         trust_score_player=50,
         trust_score_agent=50,
         tools_used=[]
@@ -20,7 +20,7 @@ class GameRepository:
         else:
             # 如果找不到就初始化一個新的
             game = GameState(
-                id=game_id,
+                session_id=game_id,
                 trust_score_player=50,
                 trust_score_agent=50,
                 tools_used=[]
