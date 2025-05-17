@@ -2,12 +2,12 @@
 import uvicorn
 
 from fastapi import FastAPI, Depends
-from fastapi.middleware.cors import CORSMiddleware
+from src.api.middleware.cors import setup_cors
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from src.api.routes import tools, agents, games  
+from src.api.routes import games_router, agents_router, news_router
 from src.api.middleware.error_handler import setup_exception_handlers
 from src.config import settings
 from src.utils.logger import logger
@@ -33,21 +33,15 @@ app = FastAPI(
 )
 
 # 設定 CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 在生產環境中應該限制來源
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+setup_cors(app)
 
 # 設定全局異常處理
 setup_exception_handlers(app)
 
 # 加載 API 路由
-app.include_router(tools.router, prefix="/api")
-app.include_router(agents.router, prefix="/api")
-app.include_router(games.router, prefix="/api")  
+app.include_router(games_router, prefix="/api")
+app.include_router(agents_router, prefix="/api")
+app.include_router(news_router, prefix="/api")
 
 # 健康檢查端點
 @app.get("/health")

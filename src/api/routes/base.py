@@ -115,10 +115,20 @@ def inject_service(service_class: Type[ServiceType]) -> Callable[[Session], Serv
 
 # 導入服務類別型別
 from src.application.services.agent_service import AgentService
+from src.application.services.news_service import NewsService
+from src.domain.logic.agent_factory import AgentFactory
+from src.infrastructure.database.agent_repo import AgentRepository
 
 def get_agent_service(db: Session = Depends(get_db)) -> AgentService:
     """獲取 Agent 服務實例"""
     return AgentService(db=db)
 
+def get_news_service(db: Session = Depends(get_db)) -> NewsService:
+    """獲取 News 服務實例"""
+    return NewsService(db=db)
+
+def get_agent_factory(db: Session = Depends(get_db)) -> AgentFactory:
+    """獲取 AgentFactory 實例"""
+    return AgentFactory(AgentRepository())
 # 如果需要 GameService 和 ToolService，請添加相應的導入
 # 然後實現對應的依賴函數

@@ -27,18 +27,15 @@ class AgentCreateRequest(BaseModel):
                 "agent_name": "TestAgent",
                 "provider": "openai",
                 "model_name": "gpt-4.1",
-                "description": "測試用 Agent",
                 "instruction": "這是指令設定",
                 "tools": {
                     "tools": [
                         {
-                            "name": "calculator",
+                            "name": "",
                             "params": {}
                         }
                     ]
                 },
-                "temperature": 0.7,
-                "num_history_responses": 10,
                 "markdown": True,
                 "debug": False
             }
@@ -65,18 +62,15 @@ class AgentUpdateRequest(BaseModel):
             "example": {
                 "provider": "openai",
                 "model_name": "gpt-4.1",
-                "description": "測試用 Agent",
                 "instruction": "這是指令設定",
                 "tools": {
                     "tools": [
                         {
-                            "name": "calculator",
+                            "name": "",
                             "params": {}
                         }
                     ]
                 },
-                "temperature": 0.7,
-                "num_history_responses": 10,
                 "markdown": True,
                 "debug": False
             }

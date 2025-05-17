@@ -49,7 +49,7 @@ class AgentService:
         Returns:
             新建立的 Agent 響應 DTO
         """
-        agent: Agent = self.repo.create_agent(
+        agent = self.repo.create_agent(
             agent_name=request.agent_name,
             provider=request.provider,
             model_name=request.model_name,
@@ -63,10 +63,6 @@ class AgentService:
             db=self.db
         )
         
-        # 明確的類型標註幫助 IDE 理解
-        created_at: datetime = agent.created_at
-        updated_at: datetime = agent.updated_at
-        
         return AgentResponse(
             id=agent.id,
             agent_name=agent.agent_name,
@@ -75,8 +71,8 @@ class AgentService:
             description=agent.description,
             tools=agent.tools,
             temperature=agent.temperature,
-            created_at=created_at.isoformat(),
-            updated_at=updated_at.isoformat()
+            created_at=agent.created_at.isoformat(),
+            updated_at=agent.updated_at.isoformat()
         )
     
     def get_agent(self, agent_id: int) -> AgentResponse:
@@ -92,11 +88,7 @@ class AgentService:
         Raises:
             ResourceNotFoundError: 如果找不到 Agent
         """
-        agent: Agent = self.repo.get_by_id(agent_id, db=self.db)
-        
-        # 明確的類型標註
-        created_at: datetime = agent.created_at
-        updated_at: datetime = agent.updated_at
+        agent = self.repo.get_by_id(agent_id, db=self.db)
         
         return AgentResponse(
             id=agent.id,
@@ -106,8 +98,8 @@ class AgentService:
             description=agent.description,
             tools=agent.tools,
             temperature=agent.temperature,
-            created_at=created_at.isoformat(),
-            updated_at=updated_at.isoformat()
+            created_at=agent.created_at.isoformat(),
+            updated_at=agent.updated_at.isoformat()
         )
     
     def get_agent_by_name(self, agent_name: str) -> Optional[AgentResponse]:
@@ -120,14 +112,10 @@ class AgentService:
         Returns:
             Agent 響應 DTO，如果未找到則返回 None
         """
-        agent: Optional[Agent] = self.repo.get_by_name(agent_name, db=self.db)
+        agent = self.repo.get_by_name(agent_name, db=self.db)
         
         if not agent:
             return None
-        
-        # 明確的類型標註
-        created_at: datetime = agent.created_at
-        updated_at: datetime = agent.updated_at
             
         return AgentResponse(
             id=agent.id,
@@ -137,8 +125,8 @@ class AgentService:
             description=agent.description,
             tools=agent.tools,
             temperature=agent.temperature,
-            created_at=created_at.isoformat(),
-            updated_at=updated_at.isoformat()
+            created_at=agent.created_at.isoformat(),
+            updated_at=agent.updated_at.isoformat()
         )
     
     def list_agents(self) -> AgentListResponse:
