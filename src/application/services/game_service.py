@@ -3,16 +3,20 @@ Game 相關的服務層邏輯。
 處理遊戲的初始化、回合管理等操作。
 """
 
-from typing import List
+from typing import List, Optional, Dict, Any
 import random
 import uuid
+import json
 
-from src.application.dto.game_dto import GameStartResponse, PlatformStatus
+from src.application.dto.game_dto import GameStartResponse, PlatformStatus, NewsPolishRequest, NewsPolishResponse
 from src.infrastructure.database.game_setup_repo import GameSetupRepository
 from src.infrastructure.database.platform_state_repo import PlatformStateRepository
 from src.infrastructure.database.news_repo import NewsRepository
 from src.infrastructure.database.action_record_repo import ActionRecordRepository
 from src.infrastructure.database.game_round_repo import GameRoundRepository
+from src.domain.logic.agent_factory import AgentFactory
+from src.utils.exceptions import BusinessLogicError, ResourceNotFoundError
+from src.utils.logger import logger
 
 # 先用 stub 代替 FakeNewsAgent
 #from src.infrastructure.agents.fake_news_agent import FakeNewsAgent
@@ -35,7 +39,8 @@ class GameService:
         news_repo: NewsRepository,
         action_repo: ActionRecordRepository,
         round_repo: GameRoundRepository,
-        agent: FakeNewsAgent
+        agent: FakeNewsAgent,
+        agent_factory: Optional[AgentFactory] = None
     ):
         """
         初始化服務。
@@ -47,6 +52,7 @@ class GameService:
             action_repo: ActionRecord 的 Repository
             round_repo: GameRound 的 Repository
             agent: 假新聞生成 Agent
+            agent_factory: Agent 工廠，用於潤稿功能
         """
         self.setup_repo = setup_repo
         self.state_repo = state_repo
@@ -54,6 +60,7 @@ class GameService:
         self.action_repo = action_repo
         self.round_repo = round_repo
         self.agent = agent
+        self.agent_factory = agent_factory
 
     def start_game(self) -> GameStartResponse:
         """
@@ -140,3 +147,100 @@ class GameService:
             trust_change=trust_delta,
             spread_change=spread_delta
         )
+        
+    def polish_news(self, request: NewsPolishRequest) -> NewsPolishResponse:
+        """
+        使用 AI 系統當物潤稿新聞內容。
+        
+        Args:
+            request: 潤稿請求物件
+            
+        Returns:
+            潤稿後的新聞內容及建議
+            
+        Raises:
+            BusinessLogicError: 處理過程中出錯
+            ResourceNotFoundError: 找不到所需資源
+        """
+        if not self.agent_factory:
+            raise BusinessLogicError("系統未設定 Agent Factory")
+        
+        # 準備 agent 變量
+        variables = {
+            "content": request.content,
+            "requirements": request.requirements,
+        }
+        
+        # 加入可選參數
+        if request.sources:
+            variables["sources"] = "\n".join(request.sources)
+        if request.platform:
+            variables["platform"] = request.platform
+        if request.platform_user:
+            variables["platform_user"] = request.platform_user
+        if request.current_situation:
+            variables["current_situation"] = request.current_situation
+        if request.additional_context:
+            # 將其他上下文屬性加入變量
+            for k, v in request.additional_context.items():
+                variables[k] = v
+        logger.info(f"request.requirements: {request.requirements}")
+        if request.requirements is None:
+            request.requirements = "將文章潤色使其更吸引人、更有說服力"
+        else:
+            request.requirements = request.requirements
+        # 調用 AI 代理
+        try:
+            result = self.agent_factory.run_agent_by_name(
+                session_id=request.session_id,
+                agent_name="news_polish_agent", 
+                variables=variables,
+                input_text=request.requirements
+            )
+            
+            # 當用 structured_output 時，有可能是字典或JSON字符串
+            result_data = None
+            
+            # 先判断是否為字典
+            if isinstance(result, dict):
+                result_data = result
+            # 如果是字符串，嘗試解析為JSON
+            elif isinstance(result, str):
+                try:
+                    result_data = json.loads(result)
+                except json.JSONDecodeError:
+                    # 如果不是有效的JSON，則直接用作潤稿內容
+                    return NewsPolishResponse(
+                        original_content=request.content,
+                        polished_content=result
+                    )
+            
+            # 如果得到了字典數據，則使用字典數據建立回應
+            # TODO: 移除多餘邏輯
+            if result_data and isinstance(result_data, dict):
+                try:
+                    return NewsPolishResponse(
+                        original_content=request.content,
+                        polished_content=result_data.get("polished_content", ""),
+                        suggestions=result_data.get("suggestions"),
+                        reasoning=result_data.get("reasoning")
+                    )
+                except Exception as e:
+                    raise BusinessLogicError(f"無法組裝回應物件: {str(e)}")
+            else:
+                # 如果不是字典或解析失敗，則直接返回
+                return NewsPolishResponse(
+                    original_content=request.content,
+                    polished_content=str(result)
+                )
+                
+        except ResourceNotFoundError as e:
+            # 找不到指定的 agent
+            raise ResourceNotFoundError(
+                message="找不到潤稿專用 Agent",
+                resource_type="agent",
+                resource_id="news_polish_agent"
+            )
+        except Exception as e:
+            # 其他錯誤
+            raise BusinessLogicError(f"潤稿過程發生錯誤: {str(e)}")

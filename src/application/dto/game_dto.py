@@ -3,7 +3,7 @@ Game 相關的 DTO (Data Transfer Objects)。
 用於遊戲初始化與回合管理的資料結構定義。
 """
 
-from typing import List
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 
@@ -66,5 +66,41 @@ class GameStartResponse(BaseModel):
                 "ai_platform": "Facebook",
                 "trust_change": 8,
                 "spread_change": 12
+            }
+        }
+
+
+class NewsPolishRequest(BaseModel):
+    """
+    新聞潤稿請求 DTO
+    """
+    session_id: str = Field(..., description="會話ID")
+    content: str = Field(..., description="使用者的新聞內容", max_length=4096)
+    requirements: Optional[str] = Field(None, description="使用者的潤稿要求", max_length=4096)
+    sources: Optional[List[str]] = Field(None, description="參考的新聞連結")
+    platform: Optional[str] = Field(None, description="即將發布的平台")
+    platform_user: Optional[str] = Field(None, description="平台用戶名稱/特徵")
+    current_situation: Optional[str] = Field(None, description="當前狀況描述")
+    additional_context: Optional[Dict[str, Any]] = Field(None, description="其他上下文資訊")
+
+class NewsPolishResponse(BaseModel):
+    """
+    新聞潤稿響應 DTO
+    """
+    original_content: str = Field(..., description="原始新聞內容")
+    polished_content: str = Field(..., description="潤稿後的新聞內容")
+    suggestions: Optional[List[str]] = Field(None, description="其他改進建議")
+    reasoning: Optional[str] = Field(None, description="潤稿思路說明")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "original_content": "台南今天舉辦淨灘活動，共有200人參與，清出300公斤垃圾。",
+                "polished_content": "【台南環保行動】藍天碧海守護者集結！今日台南黃金海岸淨灘活動吸引超過200名志工熱情參與，他們在短短三小時內清理出驚人的300公斤海洋垃圾，展現公民守護海洋生態的決心...",
+                "suggestions": [
+                    "可新增參與者感想或組織者聲明",
+                    "建議加入未來淨灘活動資訊"
+                ],
+                "reasoning": "修改重點包括：加入吸引人的標題、使用更生動的描述語言、強調環保意識、突出成就感與使命感。"
             }
         }

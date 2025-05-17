@@ -62,7 +62,7 @@ class News(Base, TimeStampMixin):
     )
 
     source = Column(
-        String(128),
+        String(1280),
         nullable=False,
         comment="新聞來源"
     )
