@@ -1,0 +1,20 @@
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey, text
+from .base import Base, TimeStampMixin
+
+class ToolUsage(Base, TimeStampMixin):
+    """
+    工具使用記錄表：記錄每次行動中使用的工具及其效果
+    """
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="工具使用記錄主鍵")
+    action_id = Column(Integer, ForeignKey('action_records.id'), nullable=False, comment="關聯的行動記錄 ID")
+    tool_name = Column(String(64), ForeignKey('tools.tool_name'), nullable=False, comment="使用的工具名稱")
+    
+    # 效果數值
+    trust_effect = Column(Integer, nullable=True, comment="對信任值的實際效果")
+    spread_effect = Column(Integer, nullable=True, comment="對傳播率的實際效果")
+    
+    # 工具使用成功否
+    is_effective = Column(Boolean, nullable=False, server_default=text("true"), comment="工具是否有效")
+
+    def __repr__(self):
+        return f"<ToolUsage id={self.id}, tool={self.tool_name}, action={self.action_id}>"

@@ -115,10 +115,36 @@ def inject_service(service_class: Type[ServiceType]) -> Callable[[Session], Serv
 
 # 導入服務類別型別
 from src.application.services.agent_service import AgentService
+from src.application.services.news_service import NewsService
+from src.application.services.game_service import GameService, FakeNewsAgent
+from src.domain.logic.agent_factory import AgentFactory
+from src.infrastructure.database.agent_repo import AgentRepository
+from src.infrastructure.database.game_setup_repo import GameSetupRepository
+from src.infrastructure.database.platform_state_repo import PlatformStateRepository
+from src.infrastructure.database.news_repo import NewsRepository
+from src.infrastructure.database.action_record_repo import ActionRecordRepository
+from src.infrastructure.database.game_round_repo import GameRoundRepository
 
 def get_agent_service(db: Session = Depends(get_db)) -> AgentService:
     """獲取 Agent 服務實例"""
     return AgentService(db=db)
 
-# 如果需要 GameService 和 ToolService，請添加相應的導入
-# 然後實現對應的依賴函數
+def get_news_service(db: Session = Depends(get_db)) -> NewsService:
+    """獲取 News 服務實例"""
+    return NewsService(db=db)
+
+def get_agent_factory(db: Session = Depends(get_db)) -> AgentFactory:
+    """獲取 AgentFactory 實例"""
+    return AgentFactory(AgentRepository())
+
+def get_game_service(db: Session = Depends(get_db), agent_factory: AgentFactory = Depends(get_agent_factory)) -> GameService:
+    """獲取 GameService 實例"""
+    return GameService(
+        setup_repo=GameSetupRepository(),
+        state_repo=PlatformStateRepository(),
+        news_repo=NewsRepository(),
+        action_repo=ActionRecordRepository(),
+        round_repo=GameRoundRepository(),
+        agent=FakeNewsAgent(),
+        agent_factory=agent_factory
+    )

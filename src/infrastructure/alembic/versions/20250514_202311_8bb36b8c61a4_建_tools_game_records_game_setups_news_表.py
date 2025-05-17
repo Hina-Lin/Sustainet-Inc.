@@ -1,7 +1,7 @@
 """建 tools, game_records, game_setups, news 表
 
 Revision ID: 8bb36b8c61a4
-Revises: 707b80235ea7
+Revises: 4b58540f3e57
 Create Date: 2025-05-14 20:23:11.371520
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '8bb36b8c61a4'
-down_revision: Union[str, None] = '707b80235ea7'
+down_revision: Union[str, None] = '4b58540f3e57'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

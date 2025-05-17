@@ -15,7 +15,7 @@ from src.application.dto.agent_dto import (
 from src.api.routes.base import get_agent_service
 from src.utils.exceptions import ResourceNotFoundError, BusinessLogicError
 from src.application.services.agent_service import AgentService
-from domain.logic.agent_factory import AgentFactory
+from src.domain.logic.agent_factory import AgentFactory
 from src.infrastructure.database.agent_repo import AgentRepository
 
 router = APIRouter(prefix="/agents", 
