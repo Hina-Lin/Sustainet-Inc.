@@ -113,9 +113,9 @@ class PlatformStateRepository(BaseRepository[PlatformState]):
         session_id: str,
         round_number: int,
         platform_name: str,
-        player_trust: int,
-        ai_trust: int,
-        spread_rate: int,
+        player_trust: Optional[int]=None,
+        ai_trust: Optional[int]=None,
+        spread_rate: Optional[int]=None,
         db: Optional[Session] = None 
     ) -> PlatformState:
         """
@@ -154,9 +154,9 @@ class PlatformStateRepository(BaseRepository[PlatformState]):
         session_id: str,
         round_number: int,
         platforms: List[dict],
-        player_trust: int,
-        ai_trust: int,
-        spread_rate: int,
+        player_trust: int=None,
+        ai_trust: int=None,
+        spread_rate: int=None,
         db: Optional[Session] = None
     ):
         """

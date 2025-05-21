@@ -107,8 +107,8 @@ class GameRoundRepository(BaseRepository[GameRound]):
         session_id: str,
         round_number: int,
         news_id: Optional[int] = None,
-        is_completed: Optional[bool] = False,  
-        db: Optional[Session] = None
+        is_completed: Optional[bool] = False, 
+        db = None
     ) -> GameRound:
         """
         更新遊戲回合的狀態或新聞 ID。
@@ -123,9 +123,46 @@ class GameRoundRepository(BaseRepository[GameRound]):
         Returns:
             更新後的 GameRound 實體
         """
-        game_round = self.get_by_session_and_round(session_id, round_number, db)
+        # 先找到 game_round instance
+        game_round = self.get_by_session_and_round(session_id, round_number)
+        # 準備要更新的欄位 dict
+        data = {}
         if news_id is not None:
-            game_round.news_id = news_id
+            data["news_id"] = news_id
         if is_completed is not None:
-            game_round.is_completed = is_completed
-        return self.update(game_round, db=db)
+            data["is_completed"] = is_completed
+        # 呼叫正確的 update
+        return self.update(game_round.id, data)
+
+    @with_session
+    def get_latest_round_by_session(
+        self,
+        session_id: str,
+        db: Optional[Session] = None
+    ) -> GameRound:
+        """
+        查詢指定 session_id 之下回合數最大的 GameRound（即最新一回合）。
+
+        Args:
+            session_id: 遊戲識別碼
+            db: 資料庫 Session（自動注入）
+
+        Returns:
+            最新一個 GameRound 實體
+
+        Raises:
+            ResourceNotFoundError: 若查無任何該 session 的 GameRound
+        """
+        result = (
+            db.query(self.model)
+            .filter_by(session_id=session_id)
+            .order_by(self.model.round_number.desc())
+            .first()
+        )
+        if not result:
+            raise ResourceNotFoundError(
+                message=f"找不到 session_id='{session_id}' 的 GameRound",
+                resource_type="game_round",
+                resource_id=session_id
+            )
+        return result

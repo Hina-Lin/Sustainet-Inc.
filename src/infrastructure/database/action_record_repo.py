@@ -134,6 +134,7 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
         spread_change: Optional[int] = None,  # 設為可選
         effectiveness: Optional[str] = None,  # 設為可選
         reach_count: Optional[int] = None,  # 設為可選
+        simulated_comments: Optional[list] = None,  # 設為可選
         db: Optional[Session] = None
     ):
         """

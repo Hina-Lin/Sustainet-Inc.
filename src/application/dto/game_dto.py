@@ -6,6 +6,8 @@ Game 相關的 DTO (Data Transfer Objects)。
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
+# ========== 通用資料物件 ==========
+
 class PlatformStatus(BaseModel):
     """
     回傳每個平台當前狀態（初始化時由 DB 取得 PlatformState 轉換而來）
@@ -20,15 +22,193 @@ class PlatformStatus(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "session_id": "game_12345",
+                "session_id": "game_001",
                 "round_number": 1,
                 "platform_name": "Facebook",
-                "player_trust": 50,
-                "ai_trust": 45,
-                "spread_rate": 65
+                "player_trust": 53,
+                "ai_trust": 67,
+                "spread_rate": 62
             }
         }
 
+class ArticleMeta(BaseModel):
+    """
+    文章的基本資訊欄位
+    """
+    title: str = Field(..., description="文章標題")
+    content: str = Field(..., description="原始內容")
+    polished_content: Optional[str] = Field(None, description="潤稿後的內容（僅玩家使用工具時提供）")
+    image_url: Optional[str] = Field(None, description="配圖連結")
+    source: Optional[str] = Field(None, description="新聞來源")
+    author: str = Field(..., description="發文者名稱，ai 或 玩家名稱")
+    published_date: str = Field(..., description="發布時間，例如 2024-05-18T15:30:00")
+    target_platform: Optional[str] = Field(None, description="文章發佈的平台（AI 回合不顯示）")
+    requirement: Optional[str] = Field(None, description="語氣或風格需求（如有）")
+    veracity: Optional[str] = Field(None, description="AI 生成文章的真實性，由 AI 或 GM 判定")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "極端氣候威脅全球能源",
+                "content": "全球近年發生多起極端氣候事件，專家警告能源政策必須加快轉型...",
+                "polished_content": None,
+                "image_url": "https://img.server/image1.jpg",
+                "source": "聯合報",
+                "author": "ai",
+                "published_date": "2025-05-21T14:45:00",
+                "target_platform": "Instagram",
+                "requirement": "強調危機感、簡明易懂",
+                "veracity": "partial"
+            }
+        }
+
+class ToolUsed(BaseModel):
+    """
+    玩家/AI 本回合實際使用的工具
+    """
+    tool_name: str = Field(..., description="工具名稱")
+    params: Optional[Dict[str, Any]] = Field(None, description="工具自定義參數（如有）")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "tool_name": "事實查核",
+                "params": {"source": "MyGoNews"}
+            }
+        }
+
+# ========== 共用回應 DTO（基底） ==========
+
+class BaseRoundResponse(BaseModel):
+    """
+    回合共用回應物件（AI/玩家/遊戲開始/回合切換都繼承此類）
+    """
+    session_id: str = Field(..., description="遊戲識別碼")
+    round_number: int = Field(..., description="回合數")
+    actor: str = Field(..., description="行動者（ai 或 player）")
+    article: ArticleMeta = Field(..., description="本回合發布的新聞內容")
+    trust_change: int = Field(..., description="本回合造成的信任值變化")
+    reach_count: int = Field(..., description="本回合的觸及人數")
+    spread_change: int = Field(..., description="本回合造成的傳播率變化")
+    platform_setup: List[Dict[str, Any]] = Field(..., description="平台與受眾組合（初始化時）")
+    platform_status: List[PlatformStatus] = Field(..., description="三平台目前狀態")
+    tool_used: Optional[List[ToolUsed]] = Field(None, description="實際使用的工具")
+    tool_list: Optional[List[Dict[str, Any]]] = Field(None, description="全部可用工具")
+    effectiveness: Optional[str] = Field(None, description="本回合貼文有效度（low/medium/high）")
+    simulated_comments: Optional[List[str]] = Field(None, description="模擬群眾留言")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "game_002",
+                "round_number": 2,
+                "actor": "player",
+                "article": {
+                    "title": "大雨致水災 民生受影響",
+                    "content": "昨夜連續暴雨導致多區域淹水，專家呼籲儘速檢討排水政策...",
+                    "author": "player1",
+                    "published_date": "2025-05-22T08:00:00"
+                },
+                "trust_change": 8,
+                "reach_count": 12345,
+                "spread_change": 5,
+                "platform_setup": [
+                    {"name": "Facebook", "audience": "年輕族群"},
+                    {"name": "Instagram", "audience": "中年族群"},
+                    {"name": "Thread", "audience": "老年族群"}
+                ],
+                "platform_status": [
+                    {
+                        "platform_name": "Facebook",
+                        "player_trust": 68,
+                        "ai_trust": 51,
+                        "spread_rate": 42
+                    }
+                ],
+                "tool_used": [
+                    {
+                        "tool_name": "圖片查證",
+                        "params": {}
+                    }
+                ],
+                "tool_list": [
+                    {
+                        "tool_name": "圖片查證",
+                        "description": "協助判斷圖片真偽",
+                        "applicable_to": "both"
+                    }
+                ],
+                "effectiveness": "medium",
+                "simulated_comments": [
+                    "這新聞看起來很可疑！",
+                    "真的發生這麼嚴重嗎？",
+                    "請政府說明！"
+                ]
+            }
+        }
+
+# ========== 遊戲開始 ==========
+
+class GameStartRequest(BaseModel):
+    """
+    開始遊戲請求 DTO
+    """
+    # 通常不需額外欄位
+
+class GameStartResponse(BaseRoundResponse):
+    """
+    遊戲開始回應 DTO，內容同 BaseRoundResponse
+    """
+    pass
+
+# ========== AI 回合 ==========
+
+class AiTurnRequest(BaseModel):
+    """
+    AI 回合請求 DTO
+    """
+    session_id: str = Field(..., description="遊戲識別碼")
+    round_number: int = Field(..., description="回合數")
+
+class AiTurnResponse(BaseRoundResponse):
+    """
+    AI 回合回應 DTO
+    """
+    pass
+
+# ========== 玩家回合 ==========
+
+class PlayerTurnRequest(BaseModel):
+    """
+    玩家回合請求 DTO
+    """
+    session_id: str = Field(..., description="遊戲識別碼")
+    round_number: int = Field(..., description="回合數")
+    article: ArticleMeta = Field(..., description="玩家發布的新聞")
+    tool_used: Optional[List[ToolUsed]] = Field(None, description="玩家實際使用的工具")
+    tool_list: Optional[List[Dict[str, Any]]] = Field(None, description="全部可用工具（前端可留空）")
+
+class PlayerTurnResponse(BaseRoundResponse):
+    """
+    玩家回合回應 DTO
+    """
+    pass
+
+# ========== 下一回合 ==========
+
+class StartNextRoundRequest(BaseModel):
+    """
+    下一回合請求 DTO
+    """
+    session_id: str = Field(..., description="遊戲識別碼")
+
+class StartNextRoundResponse(BaseRoundResponse):
+    """
+    下一回合回應 DTO
+    """
+    pass
+
+# ========== News 潤稿 ==========
 class NewsPolishRequest(BaseModel):
     """
     新聞潤稿請求 DTO
@@ -61,113 +241,5 @@ class NewsPolishResponse(BaseModel):
                     "建議加入未來淨灘活動資訊"
                 ],
                 "reasoning": "修改重點包括：加入吸引人的標題、使用更生動的描述語言、強調環保意識、突出成就感與使命感。"
-            }
-        }
-
-class FakeNewsAgentRequest(BaseModel):
-    """
-    假新聞生成請求 DTO
-    """
-    session_id: str = Field(..., description="遊戲 ID")  
-    round_number: int = Field(..., description="回合數")
-
-class ArticleMeta(BaseModel):
-    """
-    文章的基本資訊欄位
-    """
-    title: str = Field(..., description="文章標題")  
-    content: str = Field(..., description="原始內容") 
-    polished_content: Optional[str] = Field(None, description="潤稿後的內容（僅玩家使用工具時提供）")
-    image_url: Optional[str] = Field(None, description="配圖連結") 
-    source: Optional[str] = Field(None, description="新聞來源")
-    author: str = Field(..., description="發文者名稱，ai 或 玩家名稱")
-    published_date: str = Field(..., description="發布時間，例如 2024-05-18T15:30:00")
-    target_platform: Optional[str] = Field(None, description="文章發佈的平台（AI 回合不顯示）")
-    requirement: Optional[str] = Field(None, description="語氣或風格需求（如有）")
-    veracity: Optional[str] = Field(None, description="AI 生成文章的真實性，由 AI 自己判斷")
-        
-class ArticleSubmissionResponse(BaseModel):
-    """
-    發布新聞後的回應
-    """
-    session_id: str = Field(..., description="遊戲識別碼")
-    round_number: int = Field(..., description="回合數")
-    actor: str = Field(..., description="ai / player")
-    article: ArticleMeta = Field(..., description="實際發文的內容")
-    trust_change: int = Field(..., description="這回合造成的信任值變化")
-    reach_count: int = Field(..., description="這回合的觸及人數")
-    spread_change: int = Field(..., description="這回合造成的傳播率變化")
-    platform_setup: List[dict] = Field(..., description="平台+受眾組合")
-    platform_status: List[PlatformStatus] = Field(..., description="所有平台目前的狀態")
-    effectiveness: Optional[str] = Field(None, description="GM 評定效果（low / medium / high）")
-    simulated_comments: Optional[List[str]] = Field(None, description="模擬社群留言，JSON 陣列")
-    tool_used: Optional[List[Dict[str, Any]]] = Field(None, description="實際使用的工具")
-    tool_list: List[Dict[str, Any]] = Field(..., description="所有工具的名稱、描述及啟用狀況")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "session_id": "game_123456",
-                "round_number": 2,
-                "actor": "ai",
-                "article": {
-                    "title": "震驚！地球即將進入極端氣候新紀元",
-                    "content": "新研究指出...",
-                    "polished_content": None,
-                    "image_url": "https://example.com/image.jpg",
-                    "source": "虛構新聞社",
-                    "author": "ai",
-                    "published_date": "2025-05-18T15:00:00",
-                    "target_platform": "Facebook",
-                    "requirement": None,
-                    "veracity": None
-                },
-                "trust_change": 8,
-                "reach_count": 1200,
-                "spread_change": 12,
-                "platform_setup": [
-                    {"name": "Facebook", "audience": "年輕族群"},
-                    {"name": "Instagram", "audience": "中年族群"},
-                    {"name": "Thread", "audience": "老年族群"}
-                ],
-                "platform_status": [
-                    {
-                        "session_id": "game_123456",
-                        "round_number": 2,
-                        "platform_name": "Facebook",
-                        "player_trust": 50,
-                        "ai_trust": 45,
-                        "spread_rate": 65
-                    },
-                    {
-                        "session_id": "game_123456",
-                        "round_number": 2,
-                        "platform_name": "Instagram",
-                        "player_trust": 55,
-                        "ai_trust": 50,
-                        "spread_rate": 70
-                    },
-                    {
-                        "session_id": "game_123456",
-                        "round_number": 2,
-                        "platform_name": "Twitter",
-                        "player_trust": 60,
-                        "ai_trust": 55,
-                        "spread_rate": 75
-                    }
-                ],
-                "effectiveness": "high",
-                "simulated_comments": [
-                    "這新聞太誇張了吧！",
-                    "真的假的？",
-                    "我覺得有點唬爛"
-                ],
-                "tool_used": [
-                    {"tool_name": "情緒強化器", "effect": "increase_trust"}
-                ],
-                "tool_list": [
-                    {"tool_name": "情緒強化器", "description": "提升情緒感染力"},
-                    {"tool_name": "語氣轉換器", "description": "模仿年輕族群語氣"}
-                ]
             }
         }

@@ -45,7 +45,7 @@ class PlatformState(Base, TimeStampMixin):
     platform_name = Column(
         String(32),
         nullable=False,
-        comment="平台名稱（如 Facebook、Twitter）"
+        comment="平台名稱（如 Facebook、Instagram）"
     )
 
     # 玩家信任值
