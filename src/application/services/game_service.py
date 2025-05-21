@@ -187,7 +187,8 @@ class GameService:
             result = self.agent_factory.run_agent_by_name(
                 session_id=request.session_id,
                 agent_name="news_polish_agent", 
-                variables=variables
+                variables=variables,
+                input_text="input_text"
             )
             
             # 當用 structured_output 時，有可能是字典或JSON字符串
@@ -324,7 +325,8 @@ class GameService:
             result = self.agent_factory.run_agent_by_name(
             session_id=session_id,
             agent_name="fake_news_agent",
-            variables=variables
+            variables=variables,
+            input_text="input_text"
             )
 
             # 統一解析 output
@@ -533,7 +535,8 @@ class GameService:
             result = self.agent_factory.run_agent_by_name(
                 session_id=session_id,
                 agent_name="game_master_agent",
-                variables=variables
+                variables=variables,
+                input_text="input_text"
             )
 
             # 嘗試解析回傳 JSON 結果
