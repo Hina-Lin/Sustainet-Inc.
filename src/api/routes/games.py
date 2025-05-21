@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.application.services.game_service import GameService
-from src.application.dto.game_dto import GameStartResponse, NewsPolishRequest, NewsPolishResponse
+from src.application.dto.game_dto import NewsPolishRequest, NewsPolishResponse, ArticleSubmissionResponse
 from src.utils.exceptions import ResourceNotFoundError, BusinessLogicError
 from src.api.routes.base import get_game_service
 
@@ -15,7 +15,7 @@ from src.api.routes.base import get_game_service
 router = APIRouter(prefix="/games", tags=["games"])
 
 
-@router.post("/start", response_model=GameStartResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/start", response_model=ArticleSubmissionResponse, status_code=status.HTTP_201_CREATED)
 def start_game(service: GameService = Depends(get_game_service)):
     """
     開始新遊戲，回傳平台初始狀態與 AI 首次假訊息。

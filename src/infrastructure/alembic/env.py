@@ -7,6 +7,7 @@ from alembic import context
 
 # 匯入 model metadata
 from src.infrastructure.database.models.base import Base
+from src.infrastructure.database.models import action_record, agent, game_round, game_setup, news, platform_state, tools, toolusage
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

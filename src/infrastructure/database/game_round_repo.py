@@ -73,7 +73,7 @@ class GameRoundRepository(BaseRepository[GameRound]):
         self,
         session_id: str,
         round_number: int,
-        news_id: int,
+        news_id: Optional[int] = None,
         is_completed: bool = False,
         db: Optional[Session] = None
     ) -> GameRound:
@@ -83,7 +83,7 @@ class GameRoundRepository(BaseRepository[GameRound]):
         Args:
             session_id: 遊戲識別碼
             round_number: 回合編號（從 1 開始）
-            news_id: 本回合所使用的新聞 ID
+            news_id: 創建時還不需要輸入
             is_completed: 是否為已完成狀態（預設 False）
             db: 資料庫 Session（自動注入）
 
@@ -100,32 +100,32 @@ class GameRoundRepository(BaseRepository[GameRound]):
             db=db
         )
 
+    
     @with_session
-    def create_first_round(
+    def update_game_round(
         self,
         session_id: str,
         round_number: int,
-        news_id: int,
+        news_id: Optional[int] = None,
+        is_completed: Optional[bool] = False,  
         db: Optional[Session] = None
     ) -> GameRound:
         """
-        建立第一回合的遊戲記錄。
+        更新遊戲回合的狀態或新聞 ID。
 
         Args:
             session_id: 遊戲識別碼
-            round_number: 回合數（通常為 1）
-            news_id: 本回合所使用的新聞 ID
-            db: 資料庫 Session
+            round_number: 回合編號
+            news_id: 新聞 ID（可選）
+            is_completed: 是否已完成（可選）
+            db: 資料庫 Session（自動注入）
 
         Returns:
-            新創建的 GameRound 實體
+            更新後的 GameRound 實體
         """
-        return self.create(
-            {
-                "session_id": session_id,
-                "round_number": round_number,
-                "news_id": news_id,
-                "is_completed": False,
-            },
-            db=db
-        )
+        game_round = self.get_by_session_and_round(session_id, round_number, db)
+        if news_id is not None:
+            game_round.news_id = news_id
+        if is_completed is not None:
+            game_round.is_completed = is_completed
+        return self.update(game_round, db=db)

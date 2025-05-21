@@ -50,7 +50,7 @@ class GameRound(Base, TimeStampMixin):
     news_id = Column(
         Integer,
         ForeignKey("news.news_id"),
-        nullable=False,
+        nullable=True, 
         comment="本回合所使用的新聞 ID"
     )
 

@@ -17,7 +17,7 @@ class PlatformState(Base, TimeStampMixin):
     - **id**: 主鍵，自動遞增。
     - **session_id**: 對應遊戲場次 ID，對應 GameSetup 表的主鍵。
     - **round_number**: 當前回合數。
-    - **platform_name**: 平台名稱（如 Facebook、Twitter）。
+    - **platform_name**: 平台名稱（如 "Facebook", "Instagram", "Thread"）。
     - **player_trust**: 玩家在此平台的信任值（0~100）。
     - **ai_trust**: AI 在此平台的信任值（0~100）。
     - **spread_rate**: 傳播率，百分比（整數 0~100）。
