@@ -26,6 +26,13 @@ from src.domain.logic.player_action import PlayerActionLogic
 from src.utils.exceptions import BusinessLogicError, ResourceNotFoundError
 from src.utils.logger import logger
 from src.utils.text_utils import strip_code_block_and_space
+
+# Tool related imports
+from src.infrastructure.database.tool_repo import ToolRepository
+from src.infrastructure.database.tool_usage_repo import ToolUsageRepository
+from src.domain.logic.tool_effect_logic import ToolEffectLogic
+from src.domain.models.tool import DomainTool
+from src.application.dto.game_dto import ToolUsed as PlayerToolUsedDTO # Alias to avoid confusion with domain model
         
 class GameService:
     def __init__(
@@ -35,8 +42,9 @@ class GameService:
         news_repo: NewsRepository,
         action_repo: ActionRecordRepository,
         round_repo: GameRoundRepository,
+        tool_repo: ToolRepository,
+        tool_usage_repo: ToolUsageRepository,
         agent_factory: Optional[AgentFactory] = None,
-        tools_repo: Optional[Any] = None
     ):
         self.setup_repo = setup_repo
         self.state_repo = state_repo
@@ -44,7 +52,8 @@ class GameService:
         self.action_repo = action_repo
         self.round_repo = round_repo
         self.agent_factory = agent_factory
-        self.tools_repo = tools_repo
+        self.tool_repo = tool_repo
+        self.tool_usage_repo = tool_usage_repo
         
         # Domain logic instances
         self.game_init_logic = GameInitializationLogic()
@@ -52,6 +61,7 @@ class GameService:
         self.gm_logic = GameMasterLogic()
         self.game_state_logic = GameStateLogic()
         self.player_action_logic = PlayerActionLogic()
+        self.tool_effect_logic = ToolEffectLogic()
 
     def start_game(self, request: Optional[GameStartRequest] = None) -> GameStartResponse:
         # Create new game using domain logic
@@ -138,44 +148,111 @@ class GameService:
         session_id: str,
         round_number: int,
         article: Optional[ArticleMeta],
-        tool_used: Optional[List[ToolUsed]],
+        tool_used: Optional[List[PlayerToolUsedDTO]],
         tool_list: Optional[List[Dict[str, Any]]]
     ):
+        logger.info(f"Executing turn for actor: {actor}", extra={"session_id": session_id, "round_number": round_number, "tool_used_request": [t.tool_name for t in tool_used] if tool_used else []})
+
         if not self.agent_factory:
             raise BusinessLogicError("系統未設定 Agent Factory")
 
-        # Rebuild game state from database
         game = self._rebuild_game_state(session_id, round_number)
-        
+        article_to_evaluate: ArticleMeta
+        target_platform_for_action: Optional[str]
+
         if actor == "ai":
-            article = self._execute_ai_turn_logic(game, session_id)
-            target_platform = article.target_platform
+            ai_article_meta = self._execute_ai_turn_logic(game, session_id)
+            article_to_evaluate = ai_article_meta
+            target_platform_for_action = ai_article_meta.target_platform
+        elif actor == "player" and article:
+            article_to_evaluate = article
+            target_platform_for_action = article.target_platform
         else:
-            target_platform = article.target_platform
+            # This case should ideally not be reached if request validation is done at API layer
+            raise BusinessLogicError(f"無法為行動者 '{actor}' 確定要評估的文章或平台。")
 
-        # Ensure target_platform is not None
-        if not target_platform:
+        if not target_platform_for_action: 
             available_platforms = [p.name for p in game.platforms]
-            target_platform = available_platforms[0] if available_platforms else "Facebook"
-            logger.warning(f"target_platform was None, defaulting to {target_platform}")
+            target_platform_for_action = available_platforms[0] if available_platforms else "Facebook" # Default
+            logger.warning(f"target_platform_for_action for actor '{actor}' was None, defaulting to {target_platform_for_action}")
+            if article_to_evaluate: # Ensure article_to_evaluate is not None before setting attribute
+                article_to_evaluate.target_platform = target_platform_for_action
+            else:
+                # This is a more severe issue - no article to evaluate means we can't proceed for GM
+                raise BusinessLogicError(f"行動者 '{actor}' 沒有可評估的文章內容。")
 
-        # Record action
-        action = self.action_repo.create_action_record(
+        # Get original GM evaluation
+        original_gm_result: GameMasterAgentResponse = self._get_gm_evaluation(
+            game, article_to_evaluate, target_platform_for_action, round_number
+        )
+        logger.debug(f"Original GM evaluation for actor '{actor}'", extra={"session_id": session_id, "round": round_number, "gm_result": original_gm_result.model_dump()})
+        
+        final_gm_result = original_gm_result
+        tool_application_details_for_db = [] # For storing AppliedToolEffectDetail from logic
+
+        # Apply tool effects if player and tools are used
+        if actor == "player" and tool_used:
+            logger.info(f"Player '{session_id}' attempting to use tools: {[t.tool_name for t in tool_used]}", extra={"round": round_number})
+            domain_tools_to_apply: List[DomainTool] = []
+            for tool_dto in tool_used:
+                logger.debug(f"Fetching tool: '{tool_dto.tool_name}' for player '{session_id}'", extra={"round": round_number})
+                domain_tool = self.tool_repo.get_tool_by_name(tool_dto.tool_name)
+                if domain_tool and (domain_tool.applicable_to == "player" or domain_tool.applicable_to == "both"):
+                    logger.info(f"Tool '{tool_dto.tool_name}' found and applicable for player '{session_id}'.", extra={"tool_details": domain_tool.model_dump(), "round": round_number})
+                    domain_tools_to_apply.append(domain_tool)
+                else:
+                    logger.warning(f"Player '{session_id}' attempted to use invalid, non-existent, or not applicable tool: '{tool_dto.tool_name}'", extra={"round": round_number, "tool_found": domain_tool.model_dump() if domain_tool else None})
+            
+            if domain_tools_to_apply:
+                logger.debug(f"Applying effects for tools: {[t.tool_name for t in domain_tools_to_apply]} for player '{session_id}'", extra={"round": round_number})
+                final_gm_result, tool_application_details_for_db = self.tool_effect_logic.apply_effects(
+                    original_gm_result,
+                    domain_tools_to_apply
+                )
+                logger.info(f"GM evaluation after applying tools for player '{session_id}'", extra={"round": round_number, "final_gm_result": final_gm_result.model_dump() if final_gm_result else None})
+                logger.debug(f"Tool application details for DB for player '{session_id}'", extra={"round": round_number, "details": [d.model_dump() for d in tool_application_details_for_db]})
+            else:
+                logger.info(f"No applicable tools found to apply for player '{session_id}' from request: {[t.tool_name for t in tool_used]}", extra={"round": round_number})
+        
+        # Record action (this should happen before saving tool usage if action_id is FK)
+        action_record = self.action_repo.create_action_record(
             session_id=session_id,
             round_number=round_number,
             actor=actor,
-            platform=target_platform,
-            content=article.content
+            platform=target_platform_for_action,
+            content=article_to_evaluate.content
         )
 
-        # Get GM evaluation
-        gm_result = self._get_gm_evaluation(game, article, target_platform, round_number)
+        # Update database states using the final GM result (after tool effects)
+        self._update_database_states(session_id, round_number, action_record, final_gm_result, actor)
+
+        # Record tool usage in the database if any tools were effectively applied
+        if tool_application_details_for_db:
+            for usage_detail in tool_application_details_for_db:
+                if usage_detail.is_effective: # Only record if tool was deemed effective by logic
+                    logger.info(f"Recording usage for effective tool: '{usage_detail.tool_name}' for action_id: {action_record.id}", extra={"session_id": session_id, "round": round_number, "usage_detail": usage_detail.model_dump()})
+                    self.tool_usage_repo.create_tool_usage_record(
+                        action_id=action_record.id, 
+                        usage_detail=usage_detail
+                    )
+                else:
+                    logger.debug(f"Skipping DB record for non-effective tool application: '{usage_detail.tool_name}' for action_id: {action_record.id}", extra={"session_id": session_id, "round": round_number, "usage_detail": usage_detail.model_dump()})
         
-        # Update database states
-        self._update_database_states(session_id, round_number, action, gm_result, actor)
-        
-        # Convert to response
-        return self._convert_to_response(actor, session_id, round_number, article, gm_result, tool_used or [], tool_list or [])
+        # TODO: Consider a Unit of Work pattern to commit all DB changes at the end of the service method.
+        # For now, assuming individual repos handle their commits or a session is managed externally.
+
+        # Convert to response DTO
+        # The tool_used field in the response DTO should reflect what the player *attempted* to use (original list from request)
+        # The tool_list is the list of all available tools for UI purposes.
+        return self._convert_to_response(
+            actor=actor, 
+            session_id=session_id, 
+            round_number=round_number, 
+            article=article_to_evaluate, 
+            gm_result=final_gm_result, # Pass the gm_result *after* tool effects
+            tool_used=tool_used or [], 
+            tool_list=tool_list or []
+        )
     
     def _rebuild_game_state(self, session_id: str, round_number: int):
         setup_data = self.setup_repo.get_by_session_id(session_id)

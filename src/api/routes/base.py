@@ -124,6 +124,9 @@ from src.infrastructure.database.platform_state_repo import PlatformStateReposit
 from src.infrastructure.database.news_repo import NewsRepository
 from src.infrastructure.database.action_record_repo import ActionRecordRepository
 from src.infrastructure.database.game_round_repo import GameRoundRepository
+from src.infrastructure.database.tool_repo import ToolRepository
+from src.infrastructure.database.tool_usage_repo import ToolUsageRepository
+
 
 def get_agent_service(db: Session = Depends(get_db)) -> AgentService:
     """獲取 Agent 服務實例"""
@@ -145,5 +148,7 @@ def get_game_service(db: Session = Depends(get_db), agent_factory: AgentFactory 
         news_repo=NewsRepository(),
         action_repo=ActionRecordRepository(),
         round_repo=GameRoundRepository(),
+        tool_repo=ToolRepository(),
+        tool_usage_repo=ToolUsageRepository(),
         agent_factory=agent_factory
     )

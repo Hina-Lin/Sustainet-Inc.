@@ -67,13 +67,11 @@ class ToolUsed(BaseModel):
     玩家/AI 本回合實際使用的工具
     """
     tool_name: str = Field(..., description="工具名稱")
-    params: Optional[Dict[str, Any]] = Field(None, description="工具自定義參數（如有）")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "tool_name": "事實查核",
-                "params": {"source": "MyGoNews"}
+                "tool_name": "事實查核"
             }
         }
 
@@ -188,8 +186,7 @@ class BaseRoundResponse(BaseModel):
                 ],
                 "tool_used": [
                     {
-                        "tool_name": "圖片查證",
-                        "params": {}
+                        "tool_name": "圖片查證"
                     }
                 ],
                 "tool_list": [
