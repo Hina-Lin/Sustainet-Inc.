@@ -236,10 +236,12 @@ class PlatformStateRepository(BaseRepository[PlatformState]):
                 resource_id=f"{session_id}-{round_number}-{platform_name}"
             )
 
-        player_trust = player_trust
-        ai_trust = ai_trust
-        spread_rate = spread_rate
+        # 這裡才是正確做法
+        platform.player_trust = player_trust
+        platform.ai_trust = ai_trust
+        platform.spread_rate = spread_rate
         db.commit()
+
     
     @with_session    
     def update_all_platforms_states(

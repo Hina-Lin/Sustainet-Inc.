@@ -165,5 +165,7 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
             action.effectiveness = effectiveness
         if reach_count is not None:
             action.reach_count = reach_count
+        if simulated_comments is not None:
+            action.simulated_comments = simulated_comments
 
         db.commit()

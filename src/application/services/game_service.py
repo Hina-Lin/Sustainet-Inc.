@@ -371,7 +371,7 @@ class GameService:
         if actor == "ai":
             article_dict["target_platform"] = None
         article_safe = ArticleMeta.model_validate(article_dict)
-        platform_status_objs = [self.platform_status_from_dict(ps) for ps in platform_status]
+        platform_status_objs = [self.platform_status_from_dict(ps).model_dump() for ps in platform_status]
 
         # Response 組裝
         response_dict = dict(
@@ -389,6 +389,10 @@ class GameService:
             effectiveness=effectiveness,
             simulated_comments=simulated_comments
         )
+        logger.debug("platform_status 原始內容: %r", platform_status)
+        logger.debug("platform_status 組裝成物件後: %r", platform_status_objs)
+        logger.debug("response_dict 最終平台數: %d", len(response_dict["platform_status"]))
+
         # 輸出對應型別
         if actor == "ai":
             return AiTurnResponse(**response_dict)
