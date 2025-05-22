@@ -10,9 +10,8 @@ class GameRound(Base, TimeStampMixin):
     """
     遊戲回合表。
 
-    - **id**: 主鍵，自動遞增。
-    - **session_id**: 遊戲識別碼，對應 GameSetup 表。
-    - **round_number**: 回合編號（從 1 開始）。
+    - **session_id**: 遊戲識別碼，對應 GameSetup 表（複合主鍵之一）。
+    - **round_number**: 回合編號（從 1 開始）（複合主鍵之一）。
     - **news_id**: 對應新聞資料表中的主鍵。
     - **is_completed**: 回合是否已完成，預設為 False。
 
@@ -27,22 +26,17 @@ class GameRound(Base, TimeStampMixin):
     ```
     """
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-        comment="主鍵，自動遞增"
-    )
-
     session_id = Column(
         String(64),
         ForeignKey("game_setups.session_id"),
+        primary_key=True, # Part of composite primary key
         nullable=False,
         comment="對應的遊戲 session ID"
     )
 
     round_number = Column(
         Integer,
+        primary_key=True, # Part of composite primary key
         nullable=False,
         comment="回合編號（從 1 開始）"
     )

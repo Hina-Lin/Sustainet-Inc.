@@ -107,8 +107,8 @@ class GameRoundRepository(BaseRepository[GameRound]):
         session_id: str,
         round_number: int,
         news_id: Optional[int] = None,
-        is_completed: Optional[bool] = False, 
-        db = None
+        is_completed: Optional[bool] = None,
+        db: Optional[Session] = None
     ) -> GameRound:
         """
         更新遊戲回合的狀態或新聞 ID。
@@ -123,16 +123,21 @@ class GameRoundRepository(BaseRepository[GameRound]):
         Returns:
             更新後的 GameRound 實體
         """
-        # 先找到 game_round instance
-        game_round = self.get_by_session_and_round(session_id, round_number)
-        # 準備要更新的欄位 dict
-        data = {}
+        game_round = self.get_by_session_and_round(session_id, round_number, db=db)
+        
+        updated = False
         if news_id is not None:
-            data["news_id"] = news_id
+            game_round.news_id = news_id
+            updated = True
         if is_completed is not None:
-            data["is_completed"] = is_completed
-        # 呼叫正確的 update
-        return self.update(game_round.id, data)
+            game_round.is_completed = is_completed
+            updated = True
+        
+        if updated:
+            db.flush()
+            db.refresh(game_round)
+        
+        return game_round
 
     @with_session
     def get_latest_round_by_session(

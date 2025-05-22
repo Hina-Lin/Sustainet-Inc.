@@ -2,7 +2,7 @@
 Base repository class for database operations.
 Provides common synchronous CRUD operations for all entity repositories.
 """
-from typing import TypeVar, Generic, Type, List, Optional, Any, Dict, Union
+from typing import TypeVar, Generic, Type, List, Optional, Any, Dict, Union, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -39,12 +39,12 @@ class BaseRepository(Generic[T]):
             raise NotImplementedError("Repository class must define 'model' attribute")
     
     @with_session
-    def get_by_id(self, id: int, db: Session = None) -> T:
+    def get_by_pk(self, pk_value: Union[Any, Tuple[Any, ...]], db: Session = None) -> T:
         """
-        根據 ID 取得實體。
+        根據主鍵取得實體。
         
         Args:
-            id: 實體 ID
+            pk_value: 實體主鍵值 (對於複合主鍵，請傳入一個元組)
             db: 可選的數據庫 Session，如果未提供則自動創建
             
         Returns:
@@ -53,12 +53,12 @@ class BaseRepository(Generic[T]):
         Raises:
             ResourceNotFoundError: 如果找不到實體
         """
-        entity = db.get(self.model, id)
+        entity = db.get(self.model, pk_value)
         if not entity:
             raise ResourceNotFoundError(
-                message=f"{self.model.__name__} with id {id} not found",
+                message=f"{self.model.__name__} with primary key {pk_value} not found",
                 resource_type=self.model.__name__.lower(),
-                resource_id=str(id)
+                resource_id=str(pk_value)
             )
         return entity
     
@@ -124,12 +124,12 @@ class BaseRepository(Generic[T]):
         return entity
     
     @with_session
-    def update(self, id: int, data: Dict[str, Any], db: Session = None) -> T:
+    def update_by_pk(self, pk_value: Union[Any, Tuple[Any, ...]], data: Dict[str, Any], db: Session = None) -> T:
         """
-        更新實體。
+        根據主鍵更新實體。
         
         Args:
-            id: 實體 ID
+            pk_value: 實體主鍵值 (對於複合主鍵，請傳入一個元組)
             data: 要更新的數據
             db: 可選的數據庫 Session，如果未提供則自動創建
             
@@ -139,12 +139,12 @@ class BaseRepository(Generic[T]):
         Raises:
             ResourceNotFoundError: 如果找不到實體
         """
-        entity = db.get(self.model, id)
+        entity = db.get(self.model, pk_value)
         if not entity:
             raise ResourceNotFoundError(
-                message=f"{self.model.__name__} with id {id} not found",
+                message=f"{self.model.__name__} with primary key {pk_value} not found",
                 resource_type=self.model.__name__.lower(),
-                resource_id=str(id)
+                resource_id=str(pk_value)
             )
         
         # 更新實體屬性
@@ -158,23 +158,23 @@ class BaseRepository(Generic[T]):
         return entity
     
     @with_session
-    def delete(self, id: int, db: Session = None) -> None:
+    def delete_by_pk(self, pk_value: Union[Any, Tuple[Any, ...]], db: Session = None) -> None:
         """
-        刪除實體。
+        根據主鍵刪除實體。
         
         Args:
-            id: 實體 ID
+            pk_value: 實體主鍵值 (對於複合主鍵，請傳入一個元組)
             db: 可選的數據庫 Session，如果未提供則自動創建
             
         Raises:
             ResourceNotFoundError: 如果找不到實體
         """
-        entity = db.get(self.model, id)
+        entity = db.get(self.model, pk_value)
         if not entity:
             raise ResourceNotFoundError(
-                message=f"{self.model.__name__} with id {id} not found",
+                message=f"{self.model.__name__} with primary key {pk_value} not found",
                 resource_type=self.model.__name__.lower(),
-                resource_id=str(id)
+                resource_id=str(pk_value)
             )
         
         db.delete(entity)

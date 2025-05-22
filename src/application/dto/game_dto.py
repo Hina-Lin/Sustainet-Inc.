@@ -67,13 +67,72 @@ class ToolUsed(BaseModel):
     玩家/AI 本回合實際使用的工具
     """
     tool_name: str = Field(..., description="工具名稱")
-    params: Optional[Dict[str, Any]] = Field(None, description="工具自定義參數（如有）")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "tool_name": "事實查核",
-                "params": {"source": "MyGoNews"}
+                "tool_name": "事實查核"
+            }
+        }
+
+# ========== Agent Specific Responses ==========
+
+class FakeNewsAgentResponse(BaseModel):
+    title: str = Field(..., description="Agent生成的新聞標題")
+    content: str = Field(..., description="Agent生成的新聞內容")
+    image_url: Optional[str] = Field(None, description="Agent生成的圖片URL（可選）")
+    source: str = Field(..., description="Agent創造的新聞來源")
+    veracity: str = Field(..., description="Agent判定的新聞真實性 (false, partial, true)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "驚爆！太陽能板夜間竟能發電？最新突破能源界將改寫歷史！",
+                "content": "科學家團隊深夜宣布，透過革命性的奈米塗層技術，成功讓太陽能板在無光環境下收集月光甚至星光轉換為可用電力...",
+                "image_url": "https://example.com/fake_solar_night.jpg",
+                "source": "全球科技前沿報",
+                "veracity": "false"
+            }
+        }
+
+class GameMasterAgentPlatformStatus(BaseModel):
+    platform_name: str = Field(..., description="平台名稱")
+    player_trust: int = Field(..., description="該平台玩家信任度")
+    ai_trust: int = Field(..., description="該平台AI信任度")
+    spread: int = Field(..., description="該平台傳播率")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "platform_name": "Facebook",
+                "player_trust": 52,
+                "ai_trust": 45,
+                "spread": 70
+            }
+        }
+
+class GameMasterAgentResponse(BaseModel):
+    trust_change: int = Field(..., description="本回合目標平台信任值變化")
+    spread_change: int = Field(..., description="本回合目標平台傳播率變化")
+    reach_count: int = Field(..., description="本回合目標平台觸及人數")
+    platform_status: List[GameMasterAgentPlatformStatus] = Field(..., description="各平台最新狀態")
+    effectiveness: str = Field(..., description="行動有效性 (low, medium, high)")
+    simulated_comments: List[str] = Field(..., description="模擬的社群評論")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "trust_change": -10,
+                "spread_change": 15,
+                "reach_count": 390,
+                "platform_status": [
+                    {"platform_name": "Facebook", "player_trust": 40, "ai_trust": 60, "spread": 75},
+                    {"platform_name": "Instagram", "player_trust": 50, "ai_trust": 50, "spread": 50}
+                ],
+                "effectiveness": "high",
+                "simulated_comments": [
+                    "這太誇張了吧！", "消息來源可靠嗎？", "已轉發，大家注意！"
+                ]
             }
         }
 
@@ -127,8 +186,7 @@ class BaseRoundResponse(BaseModel):
                 ],
                 "tool_used": [
                     {
-                        "tool_name": "圖片查證",
-                        "params": {}
+                        "tool_name": "圖片查證"
                     }
                 ],
                 "tool_list": [

@@ -1,15 +1,7 @@
-"""
-Game 相關的服務層邏輯。
-處理遊戲的初始化、回合管理等操作。
-"""
-
 from typing import List, Optional, Dict, Any
-import random
-import uuid
 import json
 from datetime import datetime
-import re
-
+from pydantic import BaseModel
 from src.application.dto.game_dto import (
     PlatformStatus, 
     NewsPolishRequest, NewsPolishResponse,
@@ -17,31 +9,32 @@ from src.application.dto.game_dto import (
     AiTurnRequest, AiTurnResponse,
     PlayerTurnRequest, PlayerTurnResponse,
     StartNextRoundRequest, StartNextRoundResponse,
-    ArticleMeta, ToolUsed
-    )
+    ArticleMeta, ToolUsed,
+    FakeNewsAgentResponse, GameMasterAgentResponse
+)
 from src.infrastructure.database.game_setup_repo import GameSetupRepository
 from src.infrastructure.database.platform_state_repo import PlatformStateRepository
 from src.infrastructure.database.news_repo import NewsRepository
 from src.infrastructure.database.action_record_repo import ActionRecordRepository
 from src.infrastructure.database.game_round_repo import GameRoundRepository
 from src.domain.logic.agent_factory import AgentFactory
+from src.domain.logic.game_initialization import GameInitializationLogic
+from src.domain.logic.ai_turn import AiTurnLogic
+from src.domain.logic.game_master import GameMasterLogic
+from src.domain.logic.game_state import GameStateLogic
+from src.domain.logic.player_action import PlayerActionLogic
 from src.utils.exceptions import BusinessLogicError, ResourceNotFoundError
 from src.utils.logger import logger
+from src.utils.text_utils import strip_code_block_and_space
 
-# 移除 markdown code block 的輔助函數
-def strip_code_block_and_space(text: str) -> str:
-    # 砍 code block
-    cleaned = re.sub(r"^```[a-zA-Z]*\n", "", text)
-    cleaned = re.sub(r"\n?```$", "", cleaned)
-    # 砍全型、半型、no-break 空白
-    cleaned = cleaned.strip().replace('\u3000', '').replace('\xa0', '')
-    return cleaned
+# Tool related imports
+from src.infrastructure.database.tool_repo import ToolRepository
+from src.infrastructure.database.tool_usage_repo import ToolUsageRepository
+from src.domain.logic.tool_effect_logic import ToolEffectLogic
+from src.domain.models.tool import DomainTool
+from src.application.dto.game_dto import ToolUsed as PlayerToolUsedDTO # Alias to avoid confusion with domain model
         
 class GameService:
-    """
-    Game 服務類，封裝與遊戲相關的業務邏輯。
-    """
-
     def __init__(
         self,
         setup_repo: GameSetupRepository,
@@ -49,100 +42,63 @@ class GameService:
         news_repo: NewsRepository,
         action_repo: ActionRecordRepository,
         round_repo: GameRoundRepository,
+        tool_repo: ToolRepository,
+        tool_usage_repo: ToolUsageRepository,
         agent_factory: Optional[AgentFactory] = None,
-        tools_repo: Optional[Any] = None
     ):
-        """
-        初始化服務。
-
-        Args:
-            setup_repo: GameSetup 的 Repository
-            state_repo: PlatformState 的 Repository
-            news_repo: News 的 Repository
-            action_repo: ActionRecord 的 Repository
-            round_repo: GameRound 的 Repository
-            agent_factory: Agent 工廠，用於潤稿功能
-        """
         self.setup_repo = setup_repo
         self.state_repo = state_repo
         self.news_repo = news_repo
         self.action_repo = action_repo
         self.round_repo = round_repo
         self.agent_factory = agent_factory
-        self.tools_repo = tools_repo
-
-    # ========================== 開始遊戲 ==========================
+        self.tool_repo = tool_repo
+        self.tool_usage_repo = tool_usage_repo
+        
+        # Domain logic instances
+        self.game_init_logic = GameInitializationLogic()
+        self.ai_turn_logic = AiTurnLogic()
+        self.gm_logic = GameMasterLogic()
+        self.game_state_logic = GameStateLogic()
+        self.player_action_logic = PlayerActionLogic()
+        self.tool_effect_logic = ToolEffectLogic()
 
     def start_game(self, request: Optional[GameStartRequest] = None) -> GameStartResponse:
-        """
-        開始遊戲，初始化遊戲狀態。
-        1. 產生唯一的 session_id
-        2. 隨機產生三個平台與受眾的組合
-        3. 建立 GameSetup 紀錄
-        4. 建立第一回合的 PlatformState 紀錄
-        5. 建立第一回合的 GameRound 紀錄
-        6. 呼叫 AI 進行第一回合的操作    
-    
-        Returns:
-            GameStartResponse: 回傳本次遊戲初始化與第一回合 AI 行動的所有資訊，欄位如下：
-    
-            - session_id: 遊戲識別碼
-            - round_number: 回合數（預設為 1）
-            - article: ArticleMeta，AI 發布的假新聞內容
-            - actor: 本回合行動者（"ai"）
-            - trust_change: 本回合造成的信任值變化
-            - reach_count: 本回合的觸及人數
-            - spread_change: 本回合造成的傳播率變化
-            - platform_setup: 平台與受眾的組合（初始化時的 platforms）
-            - platform_status: 所有平台目前的狀態（信任值、傳播率等）
-            - tool_list: 所有可用工具的名稱、描述及啟用狀況
-            - tool_used: 本回合實際使用的工具（如有）
-
-        """
-        # 產生唯一 session_id
-        session_id = f"game_{uuid.uuid4().hex}"
-        round_number = 1 # 第一回合
+        # Create new game using domain logic
+        game = self.game_init_logic.create_new_game()
         
-        # 隨機產生 platform 與 audience 組合
-        platform_names = ["Facebook", "Instagram", "Thread"]
-        audiences = ["年輕族群", "中年族群", "老年族群"]
-        random.shuffle(audiences)
-        platforms = [{"name": name, "audience": audience} for name, audience in zip(platform_names, audiences)]
+        # Save to database
+        platforms_data = self.game_state_logic.convert_platforms_to_db_format(game.platforms)
         
-        # 建立 GameSetup 紀錄
         self.setup_repo.create_game_setup(
-            session_id=session_id, 
-            platforms=platforms, 
+            session_id=game.session_id.value, 
+            platforms=platforms_data, 
             player_initial_trust=50, 
             ai_initial_trust=50
-            )
+        )
 
-        # 建立第一回合 PlatformState（玩家信任值, AI 信任值, 傳播率皆預設 50）
         self.state_repo.create_all_platforms_states(
-            session_id=session_id,
-            round_number=round_number,
-            platforms=platforms,  # 這是一個 list of dict，例如 [{"name": "Facebook"}, ...]
+            session_id=game.session_id.value,
+            round_number=game.current_round,
+            platforms=platforms_data,
             player_trust=50,
             ai_trust=50,
             spread_rate=50
         )
         
-        # 建立第一回合 GameRound 紀錄
         self.round_repo.create_game_round(
-            session_id=session_id,
-            round_number=round_number,
+            session_id=game.session_id.value,
+            round_number=game.current_round,
             is_completed=False
         )
               
-        # 進入 AI 先攻回合
-        ai_request = AiTurnRequest(session_id=session_id, round_number=round_number)
+        # Execute AI turn
+        ai_request = AiTurnRequest(session_id=game.session_id.value, round_number=game.current_round)
         ai_response = self.ai_turn(ai_request)
         return GameStartResponse(**ai_response.model_dump())
 
-    # ========================== AI 回合 ==========================
-    
     def ai_turn(self, request: AiTurnRequest) -> AiTurnResponse:
-        return self._generic_turn(
+        return self._execute_turn(
             actor="ai",
             session_id=request.session_id,
             round_number=request.round_number,
@@ -150,11 +106,9 @@ class GameService:
             tool_used=[],
             tool_list=None
         )
-    
-    # ========================== 玩家回合 ==========================
 
     def player_turn(self, request: PlayerTurnRequest) -> PlayerTurnResponse:
-        return self._generic_turn(
+        return self._execute_turn(
             actor="player",
             session_id=request.session_id,
             round_number=request.round_number,
@@ -163,21 +117,14 @@ class GameService:
             tool_list=request.tool_list
         )
 
-    # ========================== 下一回合 ==========================
-
     def start_next_round(self, request: StartNextRoundRequest) -> StartNextRoundResponse:
-        """
-        進入下一回合，內部自動 +1，建立新狀態並啟動 AI 行動。
-        """
         session_id = request.session_id
         
-        # 查詢目前最大回合數，並自動 +1
         last_round = self.round_repo.get_latest_round_by_session(session_id)
         if not last_round:
             raise BusinessLogicError("找不到上一回合紀錄")
         round_number = last_round.round_number + 1
 
-        # 建立新回合的 PlatformState
         platforms = self.setup_repo.get_by_session_id(session_id).platforms
         self.state_repo.create_all_platforms_states(
             session_id=session_id,
@@ -185,221 +132,269 @@ class GameService:
             platforms=platforms
         )
         
-        # 建立 GameRound
         self.round_repo.create_game_round(
             session_id=session_id,
             round_number=round_number,
             is_completed=False
         )
-        # 直接呼叫 AI 先攻
+        
         ai_request = AiTurnRequest(session_id=session_id, round_number=round_number)
         ai_response = self.ai_turn(ai_request)
         return StartNextRoundResponse(**ai_response.model_dump())
 
-    # ========================== 回合主邏輯（共用） ==========================
-
-    def _generic_turn(
+    def _execute_turn(
         self,
         actor: str,
         session_id: str,
         round_number: int,
         article: Optional[ArticleMeta],
-        tool_used: Optional[List[ToolUsed]],
+        tool_used: Optional[List[PlayerToolUsedDTO]],
         tool_list: Optional[List[Dict[str, Any]]]
     ):
-        """
-        回合主流程（AI/玩家共用）。AI回合自動產生貼文；玩家回合用戶提供貼文與工具。
-        """
+        logger.info(f"Executing turn for actor: {actor}", extra={"session_id": session_id, "round_number": round_number, "tool_used_request": [t.tool_name for t in tool_used] if tool_used else []})
+
         if not self.agent_factory:
             raise BusinessLogicError("系統未設定 Agent Factory")
 
-        # 取得三平台設定
-        platforms_info = self.setup_repo.get_by_session_id(session_id).platforms
+        game = self._rebuild_game_state(session_id, round_number)
+        article_to_evaluate: ArticleMeta
+        target_platform_for_action: Optional[str]
 
-        # ======== AI 回合邏輯 ========
         if actor == "ai":
-            ai_platform_info = random.choice(platforms_info)
-            target_platform = ai_platform_info["name"]
-            target_audience = ai_platform_info["audience"]
-            # 取兩則新聞
-            news_1 = self.news_repo.get_random_active_news()
-            news_2 = self.news_repo.get_random_active_news()
-            # 工具（這邊可擴充取得 AI 可用工具）
-            all_tools = []
-            tool_used = []
-            used_tool_descriptions = "無可用工具"
-            # TODO: 這邊要從 tools_repo 取得所有可用工具
-            """
-            if hasattr(self, 'tools_repo') and self.tools_repo is not None:
-                all_tools = self.tools_repo.get_all_tools()
-                tool_used = [tool for tool in all_tools if tool.get("applicable_to") in ["ai", "both"]]
-                used_tool_descriptions = ", ".join([t.get("description") for t in tool_used if t.get("description")])
-            """
-
-            # 準備 prompt 變數
-            variables = {
-                "news_1": news_1.content,
-                "news_1_veracity": news_1.veracity,
-                "news_2": news_2.content,
-                "news_2_veracity": news_2.veracity,
-                "target_platform": target_platform,
-                "target_audience": target_audience,
-                "used_tool_descriptions": used_tool_descriptions
-            }
-
-            # 呼叫 FakeNewsAgent 生成假新聞
-            try:
-                result = self.agent_factory.run_agent_by_name(
-                session_id=session_id,
-                agent_name="fake_news_agent",
-                variables=variables,
-                input_text="input_text"
-                )
-
-                # 統一解析 output
-                if isinstance(result, dict):
-                    result_data = result
-                elif isinstance(result, str):
-                    cleaned = strip_code_block_and_space(result)
-                    logger.debug("[FakeNewsAgent] 淨化後內容：%r", cleaned)
-
-                    try:
-                        result_data = json.loads(cleaned)
-                    except Exception:
-                        raise BusinessLogicError("FakeNewsAgent 回傳格式錯誤，無法解析 JSON")
-                else:
-                    raise BusinessLogicError("FakeNewsAgent 回傳了不支援的格式")
-
-                # 組成 ArticleMeta
-                article = ArticleMeta(
-                    title=result_data.get("title"),
-                    content=result_data.get("content"),
-                    polished_content=None,
-                    image_url=result_data.get("image_url"),
-                    source=news_1.source, # 只給一個
-                    author="ai",
-                    published_date=datetime.now().isoformat(),
-                    target_platform=target_platform,  
-                    requirement=None,
-                    veracity=result_data.get("veracity")  
-                )
-            except ResourceNotFoundError:
-                raise ResourceNotFoundError(
-                    message="找不到 FakeNewsAgent",
-                    resource_type="agent",
-                    resource_id="FakeNewsAgent"
-                )
-            except Exception as e:
-                raise BusinessLogicError(f"生成假新聞過程發生錯誤: {str(e)}")
-      
-        # ======== 玩家回合邏輯 ========
+            ai_article_meta = self._execute_ai_turn_logic(game, session_id)
+            article_to_evaluate = ai_article_meta
+            target_platform_for_action = ai_article_meta.target_platform
+        elif actor == "player" and article:
+            article_to_evaluate = article
+            target_platform_for_action = article.target_platform
         else:
-            all_tools = tool_list or []
-            # 玩家自己決定 target_platform
-            target_platform = article.target_platform
+            # This case should ideally not be reached if request validation is done at API layer
+            raise BusinessLogicError(f"無法為行動者 '{actor}' 確定要評估的文章或平台。")
 
-        # 建立 ActionRecord
-        action = self.action_repo.create_action_record(
+        if not target_platform_for_action: 
+            available_platforms = [p.name for p in game.platforms]
+            target_platform_for_action = available_platforms[0] if available_platforms else "Facebook" # Default
+            logger.warning(f"target_platform_for_action for actor '{actor}' was None, defaulting to {target_platform_for_action}")
+            if article_to_evaluate: # Ensure article_to_evaluate is not None before setting attribute
+                article_to_evaluate.target_platform = target_platform_for_action
+            else:
+                # This is a more severe issue - no article to evaluate means we can't proceed for GM
+                raise BusinessLogicError(f"行動者 '{actor}' 沒有可評估的文章內容。")
+
+        # Get original GM evaluation
+        original_gm_result: GameMasterAgentResponse = self._get_gm_evaluation(
+            game, article_to_evaluate, target_platform_for_action, round_number
+        )
+        logger.debug(f"Original GM evaluation for actor '{actor}'", extra={"session_id": session_id, "round": round_number, "gm_result": original_gm_result.model_dump()})
+        
+        final_gm_result = original_gm_result
+        tool_application_details_for_db = [] # For storing AppliedToolEffectDetail from logic
+
+        # Apply tool effects if player and tools are used
+        if actor == "player" and tool_used:
+            logger.info(f"Player '{session_id}' attempting to use tools: {[t.tool_name for t in tool_used]}", extra={"round": round_number})
+            domain_tools_to_apply: List[DomainTool] = []
+            for tool_dto in tool_used:
+                logger.debug(f"Fetching tool: '{tool_dto.tool_name}' for player '{session_id}'", extra={"round": round_number})
+                domain_tool = self.tool_repo.get_tool_by_name(tool_dto.tool_name)
+                if domain_tool and (domain_tool.applicable_to == "player" or domain_tool.applicable_to == "both"):
+                    logger.info(f"Tool '{tool_dto.tool_name}' found and applicable for player '{session_id}'.", extra={"tool_details": domain_tool.model_dump(), "round": round_number})
+                    domain_tools_to_apply.append(domain_tool)
+                else:
+                    logger.warning(f"Player '{session_id}' attempted to use invalid, non-existent, or not applicable tool: '{tool_dto.tool_name}'", extra={"round": round_number, "tool_found": domain_tool.model_dump() if domain_tool else None})
+            
+            if domain_tools_to_apply:
+                logger.debug(f"Applying effects for tools: {[t.tool_name for t in domain_tools_to_apply]} for player '{session_id}'", extra={"round": round_number})
+                final_gm_result, tool_application_details_for_db = self.tool_effect_logic.apply_effects(
+                    original_gm_result,
+                    domain_tools_to_apply
+                )
+                logger.info(f"GM evaluation after applying tools for player '{session_id}'", extra={"round": round_number, "final_gm_result": final_gm_result.model_dump() if final_gm_result else None})
+                logger.debug(f"Tool application details for DB for player '{session_id}'", extra={"round": round_number, "details": [d.model_dump() for d in tool_application_details_for_db]})
+            else:
+                logger.info(f"No applicable tools found to apply for player '{session_id}' from request: {[t.tool_name for t in tool_used]}", extra={"round": round_number})
+        
+        # Record action (this should happen before saving tool usage if action_id is FK)
+        action_record = self.action_repo.create_action_record(
             session_id=session_id,
             round_number=round_number,
             actor=actor,
-            platform=target_platform,
-            content=article.content
+            platform=target_platform_for_action,
+            content=article_to_evaluate.content
         )
 
-        # AI: 更新 GameRound news_id
-        if actor == "ai":
-            self.round_repo.update_game_round(
-                session_id=session_id,
-                round_number=round_number,
-                news_id=getattr(news_1, "news_id", None),
-            )
+        # Update database states using the final GM result (after tool effects)
+        self._update_database_states(session_id, round_number, action_record, final_gm_result, actor)
 
-        # 工具倍率計算（預設 1.0，這裡可擴充）
-        trust_multiplier = 1.0
-        spread_multiplier = 1.0
+        # Record tool usage in the database if any tools were effectively applied
+        if tool_application_details_for_db:
+            for usage_detail in tool_application_details_for_db:
+                if usage_detail.is_effective: # Only record if tool was deemed effective by logic
+                    logger.info(f"Recording usage for effective tool: '{usage_detail.tool_name}' for action_id: {action_record.id}", extra={"session_id": session_id, "round": round_number, "usage_detail": usage_detail.model_dump()})
+                    self.tool_usage_repo.create_tool_usage_record(
+                        action_id=action_record.id, 
+                        usage_detail=usage_detail
+                    )
+                else:
+                    logger.debug(f"Skipping DB record for non-effective tool application: '{usage_detail.tool_name}' for action_id: {action_record.id}", extra={"session_id": session_id, "round": round_number, "usage_detail": usage_detail.model_dump()})
+        
+        # TODO: Consider a Unit of Work pattern to commit all DB changes at the end of the service method.
+        # For now, assuming individual repos handle their commits or a session is managed externally.
 
-        # GM 評分
-        gm_result = self.game_master(
+        # Convert to response DTO
+        # The tool_used field in the response DTO should reflect what the player *attempted* to use (original list from request)
+        # The tool_list is the list of all available tools for UI purposes.
+        return self._convert_to_response(
+            actor=actor, 
+            session_id=session_id, 
+            round_number=round_number, 
+            article=article_to_evaluate, 
+            gm_result=final_gm_result, # Pass the gm_result *after* tool effects
+            tool_used=tool_used or [], 
+            tool_list=tool_list or []
+        )
+    
+    def _rebuild_game_state(self, session_id: str, round_number: int):
+        setup_data = self.setup_repo.get_by_session_id(session_id)
+        platform_states = self.state_repo.get_by_session_and_round(session_id, round_number)
+        return self.game_state_logic.rebuild_game_from_db(session_id, round_number, setup_data, platform_states)
+    
+    def _execute_ai_turn_logic(self, game, session_id: str):
+        # Select platform
+        selected_platform = self.ai_turn_logic.select_platform(game.platforms)
+        
+        # Get news sources
+        news_1 = self.news_repo.get_random_active_news()
+        news_2 = self.news_repo.get_random_active_news()
+        
+        # Prepare variables for AI agent
+        variables = self.ai_turn_logic.prepare_fake_news_variables(platform=selected_platform, news_1=news_1, news_2=news_2)
+        
+        # Call AI agent with response model
+        agent_output: FakeNewsAgentResponse = self.agent_factory.run_agent_by_name(
             session_id=session_id,
-            round_number=round_number,
-            article=article,
-            platform=target_platform,
-            trust_multiplier=trust_multiplier,
-            spread_multiplier=spread_multiplier
+            agent_name="fake_news_agent",
+            variables=variables,
+            input_text="input_text",
+            response_model=FakeNewsAgentResponse
         )
-        trust_change = gm_result["trust_change"]
-        spread_change = gm_result["spread_change"]
-        reach_count = gm_result["reach_count"]
-        platform_status = gm_result["platform_status"]
-        effectiveness = gm_result.get("effectiveness")
-        simulated_comments = gm_result.get("simulated_comments")
-
-        # 更新 ActionRecord
+        
+        # Create ArticleMeta using agent_output and other system-set values
+        article = self.ai_turn_logic.create_ai_article(
+            result_data=agent_output, 
+            platform=selected_platform, 
+            source=news_1.source
+        )
+            
+        return article
+    
+    def _get_gm_evaluation(self, game, article, target_platform, round_number) -> GameMasterAgentResponse:
+        target_platform_obj = game.get_platform(target_platform)
+        variables = self.gm_logic.prepare_evaluation_variables(
+            article, target_platform_obj, game.platforms, round_number
+        )
+        
+        gm_response: GameMasterAgentResponse = self.agent_factory.run_agent_by_name(
+            session_id=game.session_id.value,
+            agent_name="game_master_agent",
+            variables=variables,
+            input_text="input_text", 
+            response_model=GameMasterAgentResponse
+        )
+        
+        return gm_response # Directly return the Pydantic model instance
+    
+    def _parse_agent_result(self, result, agent_name: str):
+        if isinstance(result, dict): 
+            return result
+        elif isinstance(result, BaseModel): # If agent_factory returned a Pydantic model
+            # If downstream code expects a Pydantic model, return as is.
+            # If it expects a dict, use result.model_dump().
+            # Given our changes, _get_gm_evaluation now returns the model directly.
+            return result # or result.model_dump() if dict is strictly needed by other callers
+        elif isinstance(result, str):
+            cleaned = strip_code_block_and_space(result)
+            try:
+                return json.loads(cleaned)
+            except Exception:
+                raise BusinessLogicError(f"{agent_name} 回傳格式錯誤，無法解析 JSON")
+        else:
+            raise BusinessLogicError(f"{agent_name} 回傳了不支援的格式")
+    
+    def _update_database_states(self, session_id, round_number, action, gm_result: GameMasterAgentResponse, actor):
+        # gm_result is now GameMasterAgentResponse, access its fields directly
         self.action_repo.update_effectiveness(
             action_id=action.id,
-            trust_change=trust_change,
-            spread_change=spread_change,
-            reach_count=reach_count,
-            effectiveness=effectiveness,
-            simulated_comments=simulated_comments
+            trust_change=gm_result.trust_change,
+            spread_change=gm_result.spread_change,
+            reach_count=gm_result.reach_count,
+            effectiveness=gm_result.effectiveness,
+            simulated_comments=gm_result.simulated_comments
         )
 
-        # 更新 PlatformState
-        for state in platform_status:
+        # Update platform states
+        for state in gm_result.platform_status: # Iterate over Pydantic models in the list
             self.state_repo.update_platform_state(
                 session_id=session_id,
                 round_number=round_number,
-                platform_name=state["platform_name"],
-                player_trust=state["player_trust"],
-                ai_trust=state["ai_trust"],
-                spread_rate=state["spread"]
+                platform_name=state.platform_name,
+                player_trust=state.player_trust,
+                ai_trust=state.ai_trust,
+                spread_rate=state.spread
             )
 
-        # 玩家回合才設 is_completed
+        # Mark round as completed for player turns
         if actor == "player":
             self.round_repo.update_game_round(
                 session_id=session_id,
                 round_number=round_number,
-                news_id=None,
                 is_completed=True
             )
-
-        # Output 結構整理（去掉 article veracity, AI 不顯示 target_platform）
+    
+    def _convert_to_response(self, actor, session_id, round_number, article, gm_result: GameMasterAgentResponse, tool_used, tool_list):
+        platforms_info = self.setup_repo.get_by_session_id(session_id).platforms
+        
+        # Clean article data
         article_dict = article.model_dump()
         article_dict["veracity"] = None
         if actor == "ai":
             article_dict["target_platform"] = None
         article_safe = ArticleMeta.model_validate(article_dict)
-        platform_status_objs = [self.platform_status_from_dict(ps).model_dump() for ps in platform_status]
+        
+        # gm_result.platform_status is already a list of GameMasterAgentPlatformStatus models.
+        # We need to convert them to dicts if PlatformStatus DTO is different or for the response structure.
+        # Assuming PlatformStatus DTO is what's expected in the final response.
+        platform_status_objs = [
+            PlatformStatus(
+                platform_name=ps.platform_name,
+                player_trust=ps.player_trust,
+                ai_trust=ps.ai_trust,
+                spread_rate=ps.spread
+                # session_id and round_number might be missing if not part of GameMasterAgentPlatformStatus
+                # and if PlatformStatus requires them. Let's assume they are optional or set elsewhere.
+            ).model_dump() for ps in gm_result.platform_status
+        ]
 
-        # Response 組裝
         response_dict = dict(
             session_id=session_id,
             round_number=round_number,
             actor=actor,
             article=article_safe,
-            trust_change=trust_change,
-            reach_count=reach_count,
-            spread_change=spread_change,
+            trust_change=gm_result.trust_change,
+            reach_count=gm_result.reach_count,
+            spread_change=gm_result.spread_change,
             platform_setup=platforms_info,
-            platform_status=platform_status_objs,
-            tool_used=tool_used or [],
-            tool_list=all_tools,
-            effectiveness=effectiveness,
-            simulated_comments=simulated_comments
+            platform_status=platform_status_objs, # List of dicts
+            tool_used=tool_used,
+            tool_list=tool_list,
+            effectiveness=gm_result.effectiveness,
+            simulated_comments=gm_result.simulated_comments
         )
-        logger.debug("platform_status 原始內容: %r", platform_status)
-        logger.debug("platform_status 組裝成物件後: %r", platform_status_objs)
-        logger.debug("response_dict 最終平台數: %d", len(response_dict["platform_status"]))
 
-        # 輸出對應型別
         if actor == "ai":
             return AiTurnResponse(**response_dict)
         else:
             return PlayerTurnResponse(**response_dict)
-   
-    # ========================== GM 評分 ==========================
     def game_master(
         self,   
         session_id: str,
@@ -409,123 +404,9 @@ class GameService:
         trust_multiplier: float = 1.0,
         spread_multiplier: float = 1.0,
     ) -> dict:
-        """
-        GameMaster：僅負責計算/回傳評分，不做任何 DB 寫入。
-    
-        Args:
-            session_id: 遊戲場次 ID
-            round_number: 回合數
-            article: ArticleMeta（本回合發文的所有欄位）
-            platform: 本回合發文的平台名稱
-            trust_multiplier: 工具倍率，影響信任值變化
-            spread_multiplier: 工具倍率，影響傳播率變化
-    
-        Returns:
-            dict: 包含本回合評分結果，格式如下：
-                {
-                    "trust_change": int,         # 本回合造成的信任值變化
-                    "spread_change": int,        # 本回合造成的傳播率變化
-                    "reach_count": int,          # 本回合的觸及人數
-                    "platform_status": [         # 各平台最新狀態
-                        {
-                            "platform_name": str,
-                            "player_trust": int,
-                            "ai_trust": int,
-                            "spread": int
-                        },
-                        ...
-                    ]
-                }
-    
-        流程說明：
-            1. 取得三平台與受眾組合
-            2. 取得三平台當前狀態
-            3. 組成平台摘要字串，傳給 GM agent
-            4. 呼叫 GameMaster agent 進行評分
-            5. 解析回傳結果，回傳評分與平台狀態
-        """  
-        
-        if not self.agent_factory:
-            raise BusinessLogicError("系統未設定 Agent Factory")
-    
-        # === 從 GameSetup 撈出三個平台與對應受眾 ===
-        game_setup = self.setup_repo.get_by_session_id(session_id)
-        platforms_info = game_setup.platforms  # JSON 欄位：list of {"name": ..., "audience": ...}
-        audience_map = {p["name"]: p["audience"] for p in platforms_info}
-
-        # === 撈出三個平台當前狀態 ===
-        platform_states = self.state_repo.get_by_session_and_round(
-            session_id=session_id,
-            round_number=round_number
-        )
-
-        # === 組成平台摘要字串給 agent 參考（含受眾）===
-        platform_state_summary = "\n".join([
-            f"{s.platform_name}（受眾：{audience_map.get(s.platform_name)}） | 玩家信任: {s.player_trust} | AI信任: {s.ai_trust} | 傳播率: {s.spread_rate}%"
-            for s in platform_states
-        ])
-
-        if article.polished_content:
-            article.content = article.polished_content
-
-        # === 準備傳給 GM agent 的變數 ===
-        variables = {
-            "title": article.title,
-            "content": article.content,
-            "image_url": article.image_url,
-            "source": article.source,
-            "veracity": article.veracity,
-            "target_platform": platform,
-            "author": article.author,
-            "trust_multiplier": trust_multiplier,
-            "spread_multiplier": spread_multiplier,
-            "platform_state_summary": platform_state_summary,
-            "round_number": round_number
-        }
-
-        # === 呼叫 GameMaster Agent 評分 ===
-        try:
-            result = self.agent_factory.run_agent_by_name(
-                session_id=session_id,
-                agent_name="game_master_agent",
-                variables=variables,
-                input_text="input_text"
-            )
-
-            # 嘗試解析回傳 JSON 結果
-            if isinstance(result, dict):
-                result_data = result
-            elif isinstance(result, str):
-                cleaned = strip_code_block_and_space(result)
-                logger.debug("[GameMasterAgent] 淨化後內容：%r", cleaned)
-                try:
-                    result_data = json.loads(cleaned)
-                except Exception as e:
-                    raise BusinessLogicError(f"GameMasterAgent 回傳格式錯誤，無法解析 JSON: {repr(cleaned)} | {str(e)}")
-            else:
-                # 強制賦值，避免後面用到 cleaned 變數未定義
-                cleaned = None
-                raise BusinessLogicError("GameMasterAgent 回傳了不支援的格式")
-
-    
-            # 基本資料與可選欄位
-            return {
-                "trust_change": result_data.get("trust_change", 0),
-                "spread_change": result_data.get("spread_change", 0),
-                "reach_count": result_data.get("reach_count", 0),
-                "platform_status": result_data.get("platform_status", []),
-                "effectiveness": result_data.get("effectiveness"),
-                "simulated_comments": result_data.get("simulated_comments")
-            }
-        except ResourceNotFoundError:
-            raise ResourceNotFoundError(
-                message="找不到 GameMasterAgent",
-                resource_type="agent",
-                resource_id="GameMasterAgent"
-            )
-
-        except Exception as e:
-            raise BusinessLogicError(f"GameMaster 評分過程發生錯誤: {str(e)}")
+        # Rebuild game state and evaluate using domain logic
+        game = self._rebuild_game_state(session_id, round_number)
+        return self._get_gm_evaluation(game, article, platform, round_number)
 
     @staticmethod
     def platform_status_from_dict(ps: dict) -> PlatformStatus:
@@ -536,32 +417,12 @@ class GameService:
             spread_rate=ps["spread"]
         )
                 
-    # ========== 新聞潤稿 ==========
-
     def polish_news(self, request: NewsPolishRequest) -> NewsPolishResponse:
-        """
-        使用 AI 系統當物潤稿新聞內容。
-        
-        Args:
-            request: 潤稿請求物件
-            
-        Returns:
-            潤稿後的新聞內容及建議
-            
-        Raises:
-            BusinessLogicError: 處理過程中出錯
-            ResourceNotFoundError: 找不到所需資源
-        """
         if not self.agent_factory:
             raise BusinessLogicError("系統未設定 Agent Factory")
         
-        # 準備 agent 變量
-        variables = {
-            "content": request.content,
-            "requirements": request.requirements,
-        }
+        variables = {"content": request.content, "requirements": request.requirements or "將文章潤色使其更吸引人、更有說服力"}
         
-        # 加入可選參數
         if request.sources:
             variables["sources"] = "\n".join(request.sources)
         if request.platform:
@@ -571,15 +432,8 @@ class GameService:
         if request.current_situation:
             variables["current_situation"] = request.current_situation
         if request.additional_context:
-            # 將其他上下文屬性加入變量
-            for k, v in request.additional_context.items():
-                variables[k] = v
-        logger.info(f"request.requirements: {request.requirements}")
-        if request.requirements is None:
-            request.requirements = "將文章潤色使其更吸引人、更有說服力"
-        else:
-            request.requirements = request.requirements
-        # 調用 AI 代理
+            variables.update(request.additional_context)
+        
         try:
             result = self.agent_factory.run_agent_by_name(
                 session_id=request.session_id,
@@ -588,49 +442,38 @@ class GameService:
                 input_text="input_text"
             )
             
-            # 當用 structured_output 時，有可能是字典或JSON字符串
-            result_data = None
-            
-            # 先判断是否為字典
             if isinstance(result, dict):
-                result_data = result
-            # 如果是字符串，嘗試解析為JSON
+                return NewsPolishResponse(
+                    original_content=request.content,
+                    polished_content=result.get("polished_content", ""),
+                    suggestions=result.get("suggestions"),
+                    reasoning=result.get("reasoning")
+                )
             elif isinstance(result, str):
                 try:
                     result_data = json.loads(result)
-                except json.JSONDecodeError:
-                    # 如果不是有效的JSON，則直接用作潤稿內容
-                    return NewsPolishResponse(
-                        original_content=request.content,
-                        polished_content=result
-                    )
-            
-            # 如果得到了字典數據，則使用字典數據建立回應
-            # TODO: 移除多餘邏輯
-            if result_data and isinstance(result_data, dict):
-                try:
                     return NewsPolishResponse(
                         original_content=request.content,
                         polished_content=result_data.get("polished_content", ""),
                         suggestions=result_data.get("suggestions"),
                         reasoning=result_data.get("reasoning")
                     )
-                except Exception as e:
-                    raise BusinessLogicError(f"無法組裝回應物件: {str(e)}")
+                except json.JSONDecodeError:
+                    return NewsPolishResponse(
+                        original_content=request.content,
+                        polished_content=result
+                    )
             else:
-                # 如果不是字典或解析失敗，則直接返回
                 return NewsPolishResponse(
                     original_content=request.content,
                     polished_content=str(result)
                 )
                 
-        except ResourceNotFoundError as e:
-            # 找不到指定的 agent
+        except ResourceNotFoundError:
             raise ResourceNotFoundError(
                 message="找不到潤稿專用 Agent",
                 resource_type="agent",
                 resource_id="news_polish_agent"
             )
         except Exception as e:
-            # 其他錯誤
             raise BusinessLogicError(f"潤稿過程發生錯誤: {str(e)}")
