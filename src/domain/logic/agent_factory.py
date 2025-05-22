@@ -83,15 +83,16 @@ class AgentFactory:
                          agent_name: str,
                          variables: Dict[str, Any],
                          input_text: Optional[str] = None,
+                         response_model: Optional[type] = None,
                          **kwargs) -> Any:
-        """
-        創建、執行指定名稱的代理，並返回結果內容。
+        """創建、執行指定名稱的代理，並返回結果內容。
 
         Args:
             session_id: 會話 ID
             agent_name: 要運行的代理名稱
             variables: 傳遞給代理模板的變數
             input_text: 傳遞給 agent.run 的輸入文本
+            response_model: 可選的響應模型類別
             **kwargs: 額外參數
 
         Returns:
@@ -115,7 +116,7 @@ class AgentFactory:
                     agent.instruction = VariablesRenderer.render_variables(agent.instruction, variables)
 
             # 3. 創建 Agent 實例
-            agent_instance = self._create_agent_from_data(session_id, agent, variables)
+            agent_instance = self._create_agent_from_data(session_id, agent, variables, response_model)
             if not agent_instance:
                 raise BusinessLogicError("無法創建 Agent 實例")
 
@@ -156,7 +157,7 @@ class AgentFactory:
         if not agent:
             raise ResourceNotFoundError(f"找不到 ID 為 {agent_id} 的 Agent")
         
-        return self._create_agent_from_data(session_id, agent, variables)
+        return self._create_agent_from_data(session_id, agent, variables, None)
 
     def create_agent_by_name(self, session_id: str, agent_name: str, variables: Dict[str, Any] = None) -> Any:
         """
@@ -178,16 +179,16 @@ class AgentFactory:
         if not agent:
             raise ResourceNotFoundError(f"找不到名稱為 {agent_name} 的 Agent")
         
-        return self._create_agent_from_data(session_id, agent, variables)
+        return self._create_agent_from_data(session_id, agent, variables, None)
 
-    def _create_agent_from_data(self, session_id: str, agent: Agent, variables: Dict[str, Any] = None) -> AgnoAgent:
-        """
-        從 Agent 資料創建 Agent 實例。
+    def _create_agent_from_data(self, session_id: str, agent: Agent, variables: Dict[str, Any] = None, response_model: Optional[type] = None) -> AgnoAgent:
+        """從 Agent 資料創建 Agent 實例。
 
         Args:
             session_id: 會話 ID
             agent: Agent 實體
             variables: 變數字典
+            response_model: 可選的響應模型類別
 
         Returns:
             創建的 Agent 實例
@@ -227,13 +228,15 @@ class AgentFactory:
             agent_instance = AgnoAgent(
                 session_id=session_id,
                 model=model,
+                response_model=response_model,
                 name=config["name"],
                 instructions=config["instruction"],
                 description=config["description"],
                 tools=config["tools"],
                 num_history_responses=config["num_history_responses"],
                 markdown=config["markdown"],
-                debug_mode=config["debug"]
+                # debug_mode=config["debug"]
+                debug_mode=True
             )
                 
             return agent_instance
@@ -279,8 +282,8 @@ class AgentFactory:
                     temperature=temperature
                 )
             else:
-                logger.warning(f"不支援的提供商 '{provider}'，使用預設的 gpt-4.1")
-                return OpenAIChat(id="gpt-4.1")
+                logger.warning(f"不支援的提供商 '{provider}'，使用預設的 claude-3-7-sonnet-latest")
+                return Claude(id="claude-3-7-sonnet-latest")
         except Exception as e:
             logger.error(f"創建模型實例失敗: {str(e)}")
             raise BusinessLogicError(f"創建模型實例失敗: {str(e)}")
