@@ -116,7 +116,7 @@ def inject_service(service_class: Type[ServiceType]) -> Callable[[Session], Serv
 # 導入服務類別型別
 from src.application.services.agent_service import AgentService
 from src.application.services.news_service import NewsService
-from src.application.services.game_service import GameService, FakeNewsAgent
+from src.application.services.game_service import GameService
 from src.domain.logic.agent_factory import AgentFactory
 from src.infrastructure.database.agent_repo import AgentRepository
 from src.infrastructure.database.game_setup_repo import GameSetupRepository
@@ -145,6 +145,5 @@ def get_game_service(db: Session = Depends(get_db), agent_factory: AgentFactory 
         news_repo=NewsRepository(),
         action_repo=ActionRecordRepository(),
         round_repo=GameRoundRepository(),
-        agent=FakeNewsAgent(),
         agent_factory=agent_factory
     )

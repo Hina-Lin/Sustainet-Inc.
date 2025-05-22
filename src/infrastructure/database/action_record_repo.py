@@ -134,6 +134,7 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
         spread_change: Optional[int] = None,  # 設為可選
         effectiveness: Optional[str] = None,  # 設為可選
         reach_count: Optional[int] = None,  # 設為可選
+        simulated_comments: Optional[list] = None,  # 設為可選
         db: Optional[Session] = None
     ):
         """
@@ -164,5 +165,7 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
             action.effectiveness = effectiveness
         if reach_count is not None:
             action.reach_count = reach_count
+        if simulated_comments is not None:
+            action.simulated_comments = simulated_comments
 
         db.commit()
