@@ -83,6 +83,7 @@ class FakeNewsAgentResponse(BaseModel):
     image_url: Optional[str] = Field(None, description="Agent生成的圖片URL（可選）")
     source: str = Field(..., description="Agent創造的新聞來源")
     veracity: str = Field(..., description="Agent判定的新聞真實性 (false, partial, true)")
+    tool_used: Optional[List[ToolUsed]] = Field(None, description="Agent實際使用的工具")
 
     class Config:
         json_schema_extra = {

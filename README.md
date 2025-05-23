@@ -12,6 +12,24 @@ API (FastAPI)
         └── Infrastructure Layer (外部依賴)
 ```
 
+### 🏗️ 重構後的架構設計
+
+本專案已進行重構，採用更嚴格的 Clean Architecture 原則：
+
+**Application Service Layer** - 只負責流程編排
+- `GameService`: 協調各個 Domain Logic 組件
+- 保持輕量，避免業務邏輯混入
+
+**Domain Logic Layer** - 核心業務邏輯
+- `TurnExecutionLogic`: 負責 AI 和玩家的行動執行
+- `GameStateManager`: 負責遊戲狀態管理、GM 評估、工具效果應用
+- `ResponseConverter`: 負責 Domain 結果轉換為 API DTO
+- `ToolEffectLogic`: 工具效果計算邏輯
+
+**Infrastructure Layer** - 外部依賴
+- Repository 模式用於資料存取
+- Agent Factory 用於 AI Agent 管理
+
 ## 📁 專案目錄結構
 
 ```
@@ -24,7 +42,12 @@ src/
 │   └── dto/                    # Pydantic 輸入 / 輸出模型
 ├── domain/                     # 核心業務邏輯
 │   ├── models/                 # Entity / ValueObject
-│   └── logic/                  # 規則計算器、得分邏輯、工具影響
+│   └── logic/                  # 業務邏輯組件
+│       ├── turn_execution.py   # 回合執行邏輯 (AI/玩家行動)
+│       ├── game_state_manager.py # 遊戲狀態管理 (GM評估、工具效果)
+│       ├── response_converter.py # 回應格式轉換
+│       ├── tool_effect_logic.py  # 工具效果計算
+│       └── ...                 # 其他業務邏輯
 ├── infrastructure/             # GPT/Agno 整合、資料庫、新聞、儲存
 │   ├── database/               # 模擬資料庫與 Repository
 │   ├── news/                   # 新聞載入器（假新聞拼接來源）
@@ -34,13 +57,43 @@ src/
 └── main.py                     # FastAPI app 入口
 ```
 
-## 📚 遊戲流程概覽
+## 🔄 重構後的流程與工具系統
 
-1. 假訊息方（AI Agent）發布訊息（真/假/部分真實）。
-2. 玩家獲得訊息，判斷與使用工具查核。
-3. 玩家可選擇查核、澄清、附和或忽略。
-4. Game Master Agent 模擬群眾反應並評分。
-5. 雙方回合交替，直到遊戲結束。
+### 🎆 新的回合執行流程
+
+1. **流程編排** (Application Service)
+   - `GameService._execute_turn()` 只負責協調各個 Domain Logic
+
+2. **行動執行** (Domain Logic)
+   - `TurnExecutionLogic.execute_actor_turn()` 處理 AI/玩家具體行動
+   - 支援 AI 和玩家的統一工具解析邏輯
+
+3. **效果評估** (Domain Logic)
+   - `GameStateManager.evaluate_and_apply_effects()` 處理 GM 評估和工具效果
+
+4. **狀態持久化** (Domain Logic)
+   - `GameStateManager.persist_turn_result()` 統一的資料庫更新
+
+5. **回應轉換** (Application Service)
+   - `ResponseConverter.to_turn_response()` 轉換為 API DTO
+
+### 🔧 統一的工具系統
+
+重構後，AI 和玩家使用相同的工具解析和效果應用邏輯：
+
+1. **AI 工具使用**：透過 System Prompt 中的工具清單，結構化輸出 `tool_used` 欄位
+2. **玩家工具使用**：透過 API 請求中的 `tool_used` 欄位
+3. **統一處理**：兩者都經過 `ToolEffectLogic.apply_effects()` 進行效果計算
+
+### 🎯 架構改進效益
+
+| 項目 | 重構前 | 重構後 |
+|------|---------|---------|
+| 工具解析邏輯 | AI 和玩家分離 | 統一處理 |
+| `_execute_turn` 行數 | ~150 行 | ~50 行 |
+| 職責数量 | 6+ 個職責 | 1 個職責 (流程編排) |
+| 可測試性 | 困難 | 容易 |
+| 符合 Clean Architecture | ❌ | ✅ |
 
 ## 🎮 遊戲機制詳解
 
@@ -418,112 +471,124 @@ Agno 會作為下列角色執行：
 
 Agno Docs: https://docs.agno.com/introduction
 
-## 📡 API 範例說明：使用工具（Use Tool）
+## 📡 API 範例說明：重構後的工具系統
 
-此範例展示一條從 API 到 Infrastructure 的完整流程，符合 Clean Architecture 設計。
+此範例展示重構後的 Clean Architecture 設計，工具使用流程更簡潔且統一。
 
-### 🧪 功能：玩家使用工具（如 Podcast 頻道）以提升信任度
+### 🧪 功能：統一的工具可用性管理
 
-1. API Layer (/api/routes/tools.py)
+每次遊戲操作都會自動返回當前回合的可用工具列表，無需額外的 API 請求。
+
+#### 核心特色：
+- **資料驅動**：工具可用性完全由資料庫 `available_from_round` 欄位控制
+- **自動返回**：所有回合操作都自動包含 `tool_list` 欄位
+- **快取優化**：內建 5 分鐘快取機制，減少資料庫詢詢
+- **統一處理**：AI 和玩家使用相同的工具解析和效果應用邏輯
+
+1. **API Layer** (/api/routes/games.py)
 
 ```python
-@router.post("/tools/use")
-def use_tool(request: UseToolRequest):
-    return use_tool_service(request)
+@router.post("/games/{session_id}/rounds/{round_number}/player-turn")
+def player_turn(request: PlayerTurnRequest):
+    return game_service.player_turn(request)
 ```
 
-職責：接收 HTTP 請求並轉交 Use Case。
+職責：接收 HTTP 請求並轉交給 Application Service。
 
-2. DTO (application/dto/use_tool_dto.py)
-
-```python
-class UseToolRequest(BaseModel):
-    game_id: str
-    tool_name: str
-    user: str  # "player" 或 "agent"
-
-class UseToolResponse(BaseModel):
-    trust_score_player: int
-    trust_score_agent: int
-    message: str
-```
-
-職責：封裝輸入與輸出資料結構，提供應用層使用。
-
-3. Application Service (application/services/use_tool.py)
+2. **Application Service** (application/services/game_service.py)
 
 ```python
-def use_tool_service(request: UseToolRequest) -> UseToolResponse:
-    game = GameRepository.get(request.game_id)
-    updated_game = apply_tool_effect(game, request.tool_name, request.user)
-    GameRepository.save(updated_game)
+def _execute_turn(self, actor, session_id, round_number, article, tool_used, tool_list):
+    # 1. 重建遊戲狀態
+    game = self.game_state_manager.rebuild_game_state(session_id, round_number)
     
-    return UseToolResponse(
-        trust_score_player=updated_game.trust_score_player,
-        trust_score_agent=updated_game.trust_score_agent,
-        message=f"Used {request.tool_name}."
+    # 2. 執行行動者回合 (統一處理 AI 和玩家)
+    turn_result = self.turn_execution_logic.execute_actor_turn(
+        game=game, actor=actor, session_id=session_id, 
+        round_number=round_number, article=article, player_tools=tool_used
+    )
+    
+    # 3. 評估效果並應用工具 (統一處理)
+    game_turn_result = self.game_state_manager.evaluate_and_apply_effects(
+        turn_result, game, self.tool_repo
+    )
+    
+    # 4. 持久化結果
+    action_id = self.game_state_manager.persist_turn_result(game_turn_result)
+    
+    # 5. 轉換為回應 DTO
+    return self.response_converter.to_turn_response(game_turn_result, tool_list)
+```
+
+職責：流程編排，協調各個 Domain Logic 組件。
+
+3. **Domain Logic - Turn Execution** (domain/logic/turn_execution.py)
+
+```python
+def execute_actor_turn(self, game, actor, session_id, round_number, article=None, player_tools=None):
+    if actor == "ai":
+        return self._execute_ai_action(game, session_id, round_number)
+    elif actor == "player":
+        return self._execute_player_action(game, session_id, round_number, article, player_tools or [])
+
+def _execute_ai_action(self, game, session_id, round_number):
+    # AI 選擇平台、生成新聞、使用工具
+    # 從 Agent 回應中解析 tool_used 欄位
+    agent_output = self.agent_factory.run_agent_by_name(...)
+    tools_used = agent_output.tool_used or []  # 結構化輸出
+    
+    return TurnExecutionResult(
+        actor="ai", session_id=session_id, round_number=round_number,
+        article=article, target_platform=platform.name, tools_used=tools_used
     )
 ```
 
-職責：處理流程邏輯、呼叫核心邏輯並與 Repository 溝通。
+職責：處理具體的行動執行邏輯，包含工具解析。
 
-4. Domain Layer - Model (domain/models/game.py)
-
-```python
-@dataclass
-class Tool:
-    name: str
-    user: str
-
-@dataclass
-class GameState:
-    id: str
-    trust_score_player: int
-    trust_score_agent: int
-    tools_used: List[Tool]
-```
-
-職責：描述遊戲狀態的資料模型。
-
-5. Domain Layer - Logic (domain/logic/tool_effect.py)
+4. **Domain Logic - Game State Manager** (domain/logic/game_state_manager.py)
 
 ```python
-def apply_tool_effect(game: GameState, tool_name: str, user: str) -> GameState:
-    # 檢查是否已使用過
-    if any(tool.name == tool_name and tool.user == user for tool in game.tools_used):
-        return game
-
-    delta = TOOL_EFFECTS.get(tool_name, 0)
-
-    # 根據使用者更新不同的 trust_score
-    if user == "player":
-        game.trust_score_player += delta
-    elif user == "agent":
-        game.trust_score_agent += delta
-
-    # 記錄工具使用
-    game.tools_used.append(Tool(name=tool_name, user=user))
-    return game
+def evaluate_and_apply_effects(self, turn_result, game, tool_repo):
+    # 1. GM 評估
+    original_gm_result = self._get_gm_evaluation(...)
+    
+    # 2. 統一的工具效果應用 (AI 和玩家使用相同邏輯)
+    if turn_result.tools_used:
+        domain_tools = self._get_applicable_tools(turn_result.tools_used, turn_result.actor, tool_repo)
+        if domain_tools:
+            final_gm_result, tool_effects = self.tool_effect_logic.apply_effects(
+                original_gm_result, domain_tools
+            )
+    
+    return GameTurnResult(turn_result, final_gm_result, tool_effects)
 ```
 
-職責：定義「工具使用後的邏輯行為」。
+職責：統一的 GM 評估和工具效果計算。
 
-6. Infrastructure Layer - Repository (infrastructure/repositories/game_repo.py)
+5. **Domain Logic - Tool Effect** (domain/logic/tool_effect_logic.py)
 
 ```python
-class GameRepository:
-    @staticmethod
-    def get(game_id: str) -> GameState:
-        # 資料庫實現
-        ...
-
-    @staticmethod
-    def save(game: GameState) -> None:
-        # 資料庫實現
-        ...
+def apply_effects(self, original_gm_response, tools):
+    # 工具效果疊加計算（乘數效果）
+    for tool in tools:
+        current_trust_change *= tool.effects.trust_multiplier
+        current_spread_change *= tool.effects.spread_multiplier
+    
+    return modified_response, applied_effects_details
 ```
 
-職責：與資料來源溝通（DB 或 in-memory），提供 Domain 使用。
+職責：純粹的工具效果計算邏輯。
+
+### 🔧 重構帶來的改進
+
+| 方面 | 重構前 | 重構後 |
+|------|--------|--------|
+| **工具處理** | AI/玩家分離邏輯 | 統一處理流程 |
+| **代碼行數** | `_execute_turn` ~150行 | `_execute_turn` ~50行 |
+| **職責分離** | 單一方法包含所有邏輯 | 每個類別單一職責 |
+| **可測試性** | 複雜依賴，難以測試 | 組件獨立，易於測試 |
+| **可維護性** | 修改影響面大 | 影響範圍可控 |
+| **擴展性** | 新功能難以添加 | 遵循開放封閉原則 |
 
 ## 📊 面板設計範例
 

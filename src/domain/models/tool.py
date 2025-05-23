@@ -17,6 +17,7 @@ class DomainTool(BaseModel):
     description: str
     applicable_to: Literal["player", "ai", "both"] # 工具適用對象
     effects: ToolEffect # 工具的核心效果
+    available_from_round: int = 1 # 從第幾回合開始可用
 
 class AppliedToolEffectDetail(BaseModel):
     """
