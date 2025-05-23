@@ -33,6 +33,7 @@ from src.application.dto.game_dto import ToolUsed as PlayerToolUsedDTO
 from src.domain.logic.turn_execution import TurnExecutionLogic
 from src.domain.logic.game_state_manager import GameStateManager
 from src.domain.logic.response_converter import ResponseConverter
+from src.domain.logic.tool_availability_logic import ToolAvailabilityLogic
         
 class GameService:
     def __init__(
@@ -71,7 +72,8 @@ class GameService:
             setup_repo, state_repo, action_repo, tool_usage_repo,
             self.game_state_logic, self.gm_logic, self.tool_effect_logic, self.agent_factory
         )
-        self.response_converter = ResponseConverter(setup_repo)
+        self.tool_availability_logic = ToolAvailabilityLogic(tool_repo)
+        self.response_converter = ResponseConverter(setup_repo, self.tool_availability_logic)
 
     def start_game(self, request: Optional[GameStartRequest] = None) -> GameStartResponse:
         # Create new game using domain logic

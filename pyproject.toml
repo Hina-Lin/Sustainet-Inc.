@@ -58,6 +58,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "aiosqlite>=0.21.0",
+    "pytest>=8.3.5",
 ]
 
 [tool.pytest.ini_options]

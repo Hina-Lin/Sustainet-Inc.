@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Float, text
+from sqlalchemy import Column, String, Text, Float, Integer, text
 from .base import Base, TimeStampMixin
 
 class Tool(Base, TimeStampMixin):
@@ -15,6 +15,9 @@ class Tool(Base, TimeStampMixin):
     
     # 工具適用對象 (player, ai, both)
     applicable_to = Column(String(32), nullable=False, server_default=text("'both'"), comment="適用對象（player/ai/both）")
+    
+    # 新增：可用回合數
+    available_from_round = Column(Integer, nullable=False, server_default=text("1"), comment="從第幾回合開始可用（預設第1回合）")
 
     def __repr__(self):
-        return f"<Tool name={self.tool_name}>"
+        return f"<Tool name={self.tool_name}, available_from={self.available_from_round}>"

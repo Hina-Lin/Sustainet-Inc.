@@ -20,7 +20,8 @@ class ToolRepository:
             description=db_tool.description,
             # Assuming db_tool.applicable_to is already one of "player", "ai", "both"
             applicable_to=db_tool.applicable_to, # type: ignore
-            effects=effects
+            effects=effects,
+            available_from_round=getattr(db_tool, 'available_from_round', 1)  # 預設第1回合
         )
 
     @with_session
