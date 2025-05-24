@@ -221,7 +221,7 @@ class GameMasterAgentPlatformStatus(BaseModel):
     platform_name: str = Field(..., description="平台名稱")
     player_trust: int = Field(..., description="該平台玩家信任度")
     ai_trust: int = Field(..., description="該平台AI信任度")
-    spread: int = Field(..., description="該平台傳播率")
+    spread_rate: int = Field(..., description="該平台傳播率")
 
     class Config:
         json_schema_extra = {
@@ -229,7 +229,7 @@ class GameMasterAgentPlatformStatus(BaseModel):
                 "platform_name": "Facebook",
                 "player_trust": 52,
                 "ai_trust": 45,
-                "spread": 70
+                "spread_rate": 70
             }
         }
 
@@ -248,8 +248,8 @@ class GameMasterAgentResponse(BaseModel):
                 "spread_change": 15,
                 "reach_count": 390,
                 "platform_status": [
-                    {"platform_name": "Facebook", "player_trust": 40, "ai_trust": 60, "spread": 75},
-                    {"platform_name": "Instagram", "player_trust": 50, "ai_trust": 50, "spread": 50}
+                    {"platform_name": "Facebook", "player_trust": 40, "ai_trust": 60, "spread_rate": 75},
+                    {"platform_name": "Instagram", "player_trust": 50, "ai_trust": 50, "spread_rate": 50}
                 ],
                 "effectiveness": "high",
                 "simulated_comments": [
@@ -278,6 +278,8 @@ class BaseRoundResponse(BaseModel):
     effectiveness: Optional[str] = Field(None, description="本回合貼文有效度（low/medium/high）")
     simulated_comments: Optional[List[str]] = Field(None, description="模擬群眾留言")
     game_end_info: Optional[Dict[str, Any]] = Field(None, description="遊戲結束資訊（如果遊戲結束）")
+    # 新增：即時遊戲狀態
+    dashboard_info: Optional[Dict[str, Any]] = Field(None, description="當前遊戲狀態面板資訊")
 
     class Config:
         json_schema_extra = {

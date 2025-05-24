@@ -139,22 +139,50 @@ class GameService:
         last_round = self.round_repo.get_latest_round_by_session(session_id)
         if not last_round:
             raise BusinessLogicError("找不到上一回合紀錄")
-        round_number = last_round.round_number + 1
+        
+        next_round_number = last_round.round_number + 1
+        
+        # 檢查是否已達最大回合數
+        if next_round_number > game_config.max_rounds:
+            # 取得最終遊戲狀態
+            final_platform_states = self.state_repo.get_by_session_and_round(
+                session_id, last_round.round_number
+            )
+            
+            platform_states_for_check = [
+                {
+                    "platform_name": state.platform_name,
+                    "player_trust": state.player_trust,
+                    "ai_trust": state.ai_trust,
+                    "spread_rate": state.spread_rate
+                }
+                for state in final_platform_states
+            ]
+            
+            game_end_result = self.game_end_logic.check_game_end_condition(
+                session_id, last_round.round_number, platform_states_for_check
+            )
+            
+            # 返回遊戲結束信息而不是開始新回合
+            raise BusinessLogicError(
+                f"遊戲已結束！{self.game_end_logic.format_game_end_summary(game_end_result)['winner_message']} "
+                f"原因：{self.game_end_logic.format_game_end_summary(game_end_result)['reason_message']}"
+            )
 
         platforms = self.setup_repo.get_by_session_id(session_id).platforms
         self.state_repo.create_all_platforms_states(
             session_id=session_id,
-            round_number=round_number,
+            round_number=next_round_number,
             platforms=platforms
         )
         
         self.round_repo.create_game_round(
             session_id=session_id,
-            round_number=round_number,
+            round_number=next_round_number,
             is_completed=False
         )
         
-        ai_request = AiTurnRequest(session_id=session_id, round_number=round_number)
+        ai_request = AiTurnRequest(session_id=session_id, round_number=next_round_number)
         ai_response = self.ai_turn(ai_request)
         return StartNextRoundResponse(**ai_response.model_dump())
 
@@ -220,9 +248,14 @@ class GameService:
             session_id, round_number, platform_states_for_check
         )
         
-        # 7. 轉換為回應 DTO
+        # 7. 構建即時Dashboard信息
+        dashboard_info = self._build_dashboard_info_for_turn(
+            session_id, round_number, game_turn_result
+        )
+        
+        # 8. 轉換為回應 DTO
         response = self.response_converter.to_turn_response(
-            game_turn_result, tool_list, game_end_result
+            game_turn_result, tool_list, game_end_result, dashboard_info
         )
         
         logger.info(f"Completed {actor} turn", extra={
@@ -235,83 +268,83 @@ class GameService:
         
         return response
 
-    def get_game_dashboard(self, request: GameDashboardRequest) -> GameDashboardResponse:
-        """
-        取得當前遊戲狀態的即時面板，顯示當前回合資訊和平台狀態
+    # def get_game_dashboard(self, request: GameDashboardRequest) -> GameDashboardResponse:
+    #     """
+    #     取得當前遊戲狀態的即時面板，顯示當前回合資訊和平台狀態
         
-        Args:
-            request: Dashboard請求
+    #     Args:
+    #         request: Dashboard請求
             
-        Returns:
-            當前遊戲狀態的即時面板數據
-        """
-        session_id = request.session_id
+    #     Returns:
+    #         當前遊戲狀態的即時面板數據
+    #     """
+    #     session_id = request.session_id
         
-        try:
-            # 1. 取得最新回合
-            latest_round = self.round_repo.get_latest_round_by_session(session_id)
-            current_round_number = latest_round.round_number
+    #     try:
+    #         # 1. 取得最新回合
+    #         latest_round = self.round_repo.get_latest_round_by_session(session_id)
+    #         current_round_number = latest_round.round_number
             
-            # 2. 取得當前回合的行動記錄
-            current_actions = self.action_repo.get_actions_by_session_and_round(
-                session_id, current_round_number
-            )
+    #         # 2. 取得當前回合的行動記錄
+    #         current_actions = self.action_repo.get_actions_by_session_and_round(
+    #             session_id, current_round_number
+    #         )
             
-            # 3. 取得當前回合的平台狀態
-            current_platform_states = self.state_repo.get_by_session_and_round(
-                session_id, current_round_number
-            )
+    #         # 3. 取得當前回合的平台狀態
+    #         current_platform_states = self.state_repo.get_by_session_and_round(
+    #             session_id, current_round_number
+    #         )
             
-            # 4. 建立當前回合資訊
-            current_round_info = self._build_current_round_info(
-                current_round_number, current_actions
-            )
+    #         # 4. 建立當前回合資訊
+    #         current_round_info = self._build_current_round_info(
+    #             current_round_number, current_actions
+    #         )
             
-            # 5. 建立平台狀態（包含趨勢）
-            platform_dashboard_status = self._build_platform_dashboard_status(
-                session_id, current_round_number, current_platform_states
-            )
+    #         # 5. 建立平台狀態（包含趨勢）
+    #         platform_dashboard_status = self._build_platform_dashboard_status(
+    #             session_id, current_round_number, current_platform_states
+    #         )
             
-            # 6. 建立遊戲進度
-            game_progress = {
-                "current_round": current_round_number,
-                "max_rounds": game_config.max_rounds,
-                "is_ended": False
-            }
+    #         # 6. 建立遊戲進度
+    #         game_progress = {
+    #             "current_round": current_round_number,
+    #             "max_rounds": game_config.max_rounds,
+    #             "is_ended": current_round_number >= game_config.max_rounds  # 修正：正確設定結束狀態
+    #         }
             
-            # 7. 檢查遊戲結束狀態
-            game_end_info = None
-            platform_states_for_check = [
-                {
-                    "platform_name": state.platform_name,
-                    "player_trust": state.player_trust,
-                    "ai_trust": state.ai_trust,
-                    "spread_rate": state.spread_rate
-                }
-                for state in current_platform_states
-            ]
+    #         # 7. 檢查遊戲結束狀態
+    #         game_end_info = None
+    #         platform_states_for_check = [
+    #             {
+    #                 "platform_name": state.platform_name,
+    #                 "player_trust": state.player_trust,
+    #                 "ai_trust": state.ai_trust,
+    #                 "spread_rate": state.spread_rate
+    #             }
+    #             for state in current_platform_states
+    #         ]
             
-            game_end_result = self.game_end_logic.check_game_end_condition(
-                session_id, current_round_number, platform_states_for_check
-            )
+    #         game_end_result = self.game_end_logic.check_game_end_condition(
+    #             session_id, current_round_number, platform_states_for_check
+    #         )
             
-            if game_end_result["is_ended"]:
-                game_end_info = self.game_end_logic.format_game_end_summary(game_end_result)
-                game_progress["is_ended"] = True
+    #         if game_end_result["is_ended"]:
+    #             game_end_info = self.game_end_logic.format_game_end_summary(game_end_result)
+    #             game_progress["is_ended"] = True
             
-            return GameDashboardResponse(
-                session_id=session_id,
-                current_round=current_round_info,
-                platform_status=platform_dashboard_status,
-                game_progress=game_progress,
-                game_end_info=game_end_info
-            )
+    #         return GameDashboardResponse(
+    #             session_id=session_id,
+    #             current_round=current_round_info,
+    #             platform_status=platform_dashboard_status,
+    #             game_progress=game_progress,
+    #             game_end_info=game_end_info
+    #         )
             
-        except ResourceNotFoundError:
-            raise
-        except Exception as e:
-            logger.error(f"Dashboard error for session {session_id}: {str(e)}")
-            raise BusinessLogicError(f"取得遊戲面板時發生錯誤: {str(e)}")
+    #     except ResourceNotFoundError:
+    #         raise
+    #     except Exception as e:
+    #         logger.error(f"Dashboard error for session {session_id}: {str(e)}")
+    #         raise BusinessLogicError(f"取得遊戲面板時發生錯誤: {str(e)}")
     
     def _build_current_round_info(self, round_number: int, actions: List) -> CurrentRoundInfo:
         """建立當前回合資訊"""
@@ -447,6 +480,142 @@ class GameService:
         }
         
         return translation.get(effectiveness.lower(), effectiveness)
+    
+    def _build_dashboard_info_for_turn(
+        self, 
+        session_id: str, 
+        round_number: int, 
+        game_turn_result
+    ) -> Dict[str, Any]:
+        """為回合回應構建即時dashboard信息"""
+        try:
+            # 取得當前回合的行動記錄（包含剛執行的行動）
+            current_actions = self.action_repo.get_actions_by_session_and_round(
+                session_id, round_number
+            )
+            
+            # 取得當前平台狀態（從 GM 評估結果中取得）
+            platform_states = [
+                {
+                    "platform_name": state.platform_name,
+                    "player_trust": state.player_trust,
+                    "ai_trust": state.ai_trust,
+                    "spread_rate": state.spread_rate  # 修正：從 .spread 改為 .spread_rate
+                }
+                for state in game_turn_result.gm_evaluation.platform_status
+            ]
+            
+            # 建立當前回合資訊
+            current_round_info = self._build_current_round_info_from_actions(
+                round_number, current_actions
+            )
+            
+            # 建立平台狀態（包含趋勢）
+            platform_dashboard_status = self._build_platform_dashboard_status_from_states(
+                session_id, round_number, platform_states
+            )
+            
+            # 遊戲進度
+            game_progress = {
+                "current_round": round_number,
+                "max_rounds": game_config.max_rounds,
+                "is_ended": round_number >= game_config.max_rounds  # 修正：正確設定結束狀態
+            }
+            
+            return {
+                "current_round": current_round_info,
+                "platform_status": platform_dashboard_status,
+                "game_progress": game_progress
+            }
+            
+        except Exception as e:
+            logger.warning(f"Failed to build dashboard info for turn: {str(e)}")
+            return {}
+    
+    def _build_current_round_info_from_actions(self, round_number: int, actions: List) -> Dict[str, Any]:
+        """從行動記錄建立當前回合資訊（簡化版）"""
+        ai_action = None
+        player_action = None
+        
+        for action in actions:
+            if action.actor == "ai":
+                ai_action = action
+            elif action.actor == "player":
+                player_action = action
+        
+        info = {"round_number": round_number}
+        
+        # AI新聞簡化信息
+        if ai_action:
+            info["ai_news"] = {
+                "title": ai_action.content[:50] + "…" if len(ai_action.content) > 50 else ai_action.content,
+                "platform": ai_action.platform,
+                "reach_count": ai_action.reach_count or 0,
+                "trust_change": ai_action.trust_change or 0
+            }
+            
+            # 社群反應（只取前2個）
+            if ai_action.simulated_comments:
+                info["social_reactions"] = ai_action.simulated_comments[:2]
+        
+        # 玩家回應簡化信息
+        if player_action:
+            tools_used = [
+                tool.tool_name for tool in 
+                self.tool_usage_repo.get_by_action_id(player_action.id)
+            ]
+            
+            info["player_response"] = {
+                "effectiveness": self._translate_effectiveness(player_action.effectiveness),
+                "trust_change": player_action.trust_change or 0,
+                "tools_used": tools_used
+            }
+        
+        return info
+    
+    def _build_platform_dashboard_status_from_states(
+        self, 
+        session_id: str, 
+        current_round: int, 
+        platform_states: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """從平台狀態建立面板狀態（簡化版）"""
+        dashboard_statuses = []
+        
+        for state in platform_states:
+            # 計算趋勢
+            trust_trend = "→"  # 默認
+            
+            if current_round > 1:
+                try:
+                    prev_states = self.state_repo.get_by_session_and_round(
+                        session_id, current_round - 1
+                    )
+                    prev_state = next(
+                        (s for s in prev_states if s.platform_name == state["platform_name"]), 
+                        None
+                    )
+                    
+                    if prev_state:
+                        player_diff = state["player_trust"] - prev_state.player_trust
+                        if player_diff > 0:
+                            trust_trend = "↗"
+                        elif player_diff < 0:
+                            trust_trend = "↘"
+                except:
+                    pass
+            
+            dashboard_status = {
+                "platform_name": state["platform_name"],
+                "player_trust": state["player_trust"],
+                "ai_trust": state["ai_trust"],
+                "spread_rate": state["spread_rate"],
+                "trust_trend": trust_trend
+            }
+            
+            dashboard_statuses.append(dashboard_status)
+        
+        return dashboard_statuses
     
     def polish_news(self, request: NewsPolishRequest) -> NewsPolishResponse:
         if not self.agent_factory:
