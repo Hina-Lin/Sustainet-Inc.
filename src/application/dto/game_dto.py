@@ -29,6 +29,127 @@ class PlatformStatus(BaseModel):
                 "ai_trust": 67,
                 "spread_rate": 62
             }
+            }
+
+# ========== Dashboard ==========
+
+class GameDashboardRequest(BaseModel):
+    """
+    遊戲面板請求 DTO
+    """
+    session_id: str = Field(..., description="遊戲識別碼")
+
+class CurrentRoundInfo(BaseModel):
+    """
+    當前回合資訊
+    """
+    round_number: int = Field(..., description="當前回合數")
+    ai_news: Optional[Dict[str, Any]] = Field(None, description="AI發布的假訊息")
+    player_response: Optional[Dict[str, Any]] = Field(None, description="玩家回應")
+    social_reactions: List[str] = Field(default=[], description="社群反應留言")
+    ai_impact: Optional[Dict[str, Any]] = Field(None, description="AI影響評估")
+    clarification_effect: Optional[Dict[str, Any]] = Field(None, description="澄清效果")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "round_number": 3,
+                "ai_news": {
+                    "title": "據說新再生能源其實會導致更多空汙，研究顯示…",
+                    "content": "在新的研究中發現...",
+                    "platform": "Instagram",
+                    "category": "能源環保"
+                },
+                "player_response": {
+                    "content": "實際上，太陽能與風力造成的污染極低，資料來自能源署。",
+                    "tools_used": ["引用權威"]
+                },
+                "social_reactions": [
+                    "假的啦，再生能源明明比石化好 (質疑)",
+                    "我也有看到這個，真的假的 (疑惑)",
+                    "怎麼沒有主流媒體報？ (質疑)"
+                ],
+                "ai_impact": {
+                    "reach_count": 390,
+                    "spread_change": "+15%",
+                    "trust_change": "-10 點 (從 50 降至 40)",
+                    "effectiveness": "高傳播，因情緒性語句 + 無來源"
+                },
+                "clarification_effect": {
+                    "tool_bonus": "信任度 +5",
+                    "final_effectiveness": "中度有效",
+                    "reach_count": 120,
+                    "trust_change": "+16 點 (從 40 升至 56)"
+                }
+            }
+        }
+
+class PlatformDashboardStatus(BaseModel):
+    """
+    面板用平台狀態顯示
+    """
+    platform_name: str = Field(..., description="平台名稱")
+    player_trust: int = Field(..., description="玩家信任度")
+    ai_trust: int = Field(..., description="AI信任度")
+    spread_rate: int = Field(..., description="傳播率")
+    trust_trend: str = Field(..., description="信任度趋势", example="↗")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "platform_name": "Instagram",
+                "player_trust": 56,
+                "ai_trust": 40,
+                "spread_rate": 75,
+                "trust_trend": "↗"
+            }
+        }
+
+class GameDashboardResponse(BaseModel):
+    """
+    遊戲面板回應 DTO - 顯示當前遊戲狀態的即時面板
+    """
+    session_id: str = Field(..., description="遊戲識別碼")
+    current_round: CurrentRoundInfo = Field(..., description="當前回合資訊")
+    platform_status: List[PlatformDashboardStatus] = Field(..., description="平台狀態")
+    game_progress: Dict[str, Any] = Field(..., description="遊戲進度")
+    game_end_info: Optional[Dict[str, Any]] = Field(None, description="遊戲結束資訊（如果已結束）")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "game_123",
+                "current_round": {
+                    "round_number": 3,
+                    "ai_news": {
+                        "title": "據說新再生能源其實會導致更多空汙",
+                        "platform": "Instagram",
+                        "category": "能源環保"
+                    },
+                    "social_reactions": [
+                        "假的啦，再生能源明明比石化好 (質疑)"
+                    ],
+                    "ai_impact": {
+                        "reach_count": 390,
+                        "trust_change": "-10 點"
+                    }
+                },
+                "platform_status": [
+                    {
+                        "platform_name": "Instagram",
+                        "player_trust": 56,
+                        "ai_trust": 40,
+                        "spread_rate": 75,
+                        "trust_trend": "↗"
+                    }
+                ],
+                "game_progress": {
+                    "current_round": 3,
+                    "max_rounds": 10,
+                    "is_ended": False
+                },
+                "game_end_info": None
+            }
         }
 
 class ArticleMeta(BaseModel):
@@ -156,6 +277,7 @@ class BaseRoundResponse(BaseModel):
     tool_list: Optional[List[Dict[str, Any]]] = Field(None, description="全部可用工具")
     effectiveness: Optional[str] = Field(None, description="本回合貼文有效度（low/medium/high）")
     simulated_comments: Optional[List[str]] = Field(None, description="模擬群眾留言")
+    game_end_info: Optional[Dict[str, Any]] = Field(None, description="遊戲結束資訊（如果遊戲結束）")
 
     class Config:
         json_schema_extra = {

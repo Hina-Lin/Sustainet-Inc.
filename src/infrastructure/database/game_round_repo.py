@@ -35,6 +35,29 @@ class GameRoundRepository(BaseRepository[GameRound]):
     model = GameRound
 
     @with_session
+    def get_all_rounds_by_session(
+        self,
+        session_id: str,
+        db: Optional[Session] = None
+    ) -> list[GameRound]:
+        """
+        查詢指定 session_id 下的所有回合，依回合號排序。
+
+        Args:
+            session_id: 遊戲識別碼
+            db: 資料庫 Session（自動注入）
+
+        Returns:
+            按回合號排序的 GameRound 列表
+        """
+        return (
+            db.query(self.model)
+            .filter_by(session_id=session_id)
+            .order_by(self.model.round_number.asc())
+            .all()
+        )
+
+    @with_session
     def get_by_session_and_round(
         self,
         session_id: str,

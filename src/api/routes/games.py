@@ -10,7 +10,8 @@ from src.application.dto.game_dto import (
     GameStartRequest, GameStartResponse,
     AiTurnRequest, AiTurnResponse,
     PlayerTurnRequest, PlayerTurnResponse,
-    StartNextRoundRequest, StartNextRoundResponse
+    StartNextRoundRequest, StartNextRoundResponse,
+    GameDashboardRequest, GameDashboardResponse
     )
 from src.utils.exceptions import ResourceNotFoundError, BusinessLogicError
 from src.api.routes.base import get_game_service
@@ -236,7 +237,56 @@ def start_next_round(
             detail=str(e)
         )
     except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"切換回合過程發生錯誤: {str(e)}"
+            )
+
+@router.get("/dashboard/{session_id}", response_model=GameDashboardResponse)
+def get_game_dashboard(
+    session_id: str,
+    service: GameService = Depends(get_game_service)
+):
+    """
+    ## 遊戲面板（Dashboard）
+    取得指定遊戲的完整歷史記錄和當前狀態，包含所有回合的詳細資訊。
+
+    ### Path Parameters
+    * session_id: 遊戲識別碼（string，由 URL 传入）
+
+    ### Response
+    * session_id: 遊戲識別碼
+    * game_summary: 遊戲摘要訊息（回合數、開始時間、是否結束等）
+    * round_records: 所有回合的詳細記錄（AI和玩家行動、平台狀態等）
+    * current_status: 當前遊戲狀態統計（總信任值、領先者等）
+    * game_end_info: 遊戲結束資訊（如果遊戲已結束）
+
+    ### 使用場景
+    適合用於前端建立遊戲面板，展示：
+    - 遊戲進度與結束狀態
+    - 每回合的AI和玩家行動記錄
+    - 平台信任值變化趨勢
+    - 社群模擬留言
+    - 工具使用情況
+
+    ~~~注意~~~
+    此 API 會返回大量數據，建議前端做好緩存和分頁處理。
+    """
+    try:
+        request = GameDashboardRequest(session_id=session_id)
+        return service.get_game_dashboard(request)
+    except ResourceNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except BusinessLogicError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"切換回合過程發生錯誤: {str(e)}"
+            detail=f"取得遊戲面板時發生錯誤: {str(e)}"
         )

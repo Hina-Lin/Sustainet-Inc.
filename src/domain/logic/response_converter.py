@@ -19,7 +19,8 @@ class ResponseConverter:
     def to_turn_response(
         self, 
         game_turn_result: GameTurnResult, 
-        tool_list: Optional[List[Dict[str, Any]]] = None
+        tool_list: Optional[List[Dict[str, Any]]] = None,
+        game_end_result: Optional[Dict[str, Any]] = None
     ):
         """轉換為回合回應 DTO"""
         turn_result = game_turn_result.turn_result
@@ -57,6 +58,10 @@ class ResponseConverter:
             "effectiveness": gm_result.effectiveness,
             "simulated_comments": gm_result.simulated_comments
         }
+        
+        # 添加遊戲結束信息（如果有的話）
+        if game_end_result:
+            response_dict["game_end_info"] = game_end_result
         
         # 根據行動者類型返回對應的回應
         if turn_result.actor == "ai":
