@@ -35,11 +35,37 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
     )
 
     # 查詢回合內所有行動
-    actions = repo.get_by_session_and_round("game123", 1)
+    actions = repo.get_actions_by_session_and_round("game123", 1)
     ```
     """
 
     model = ActionRecord
+
+    @with_session
+    def get_actions_by_session_and_round(
+        self,
+        session_id: str,
+        round_number: int,
+        db: Optional[Session] = None
+    ) -> List[ActionRecord]:
+        """
+        查詢指定遊戲與回合中所有行動記錄。
+        在找不到時返回空列表而非拋出例外。
+
+        Args:
+            session_id: 遊戲識別碼
+            round_number: 回合編號
+            db: 資料庫 Session（自動注入）
+
+        Returns:
+            該回合內所有行動記錄（可能為空列表）
+        """
+        return (
+            db.query(self.model)
+            .filter_by(session_id=session_id, round_number=round_number)
+            .order_by(self.model.created_at.asc())
+            .all()
+        )
 
     @with_session
     def get_by_session_and_round(
@@ -124,7 +150,6 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
             },
             db=db
         )
-
 
     @with_session
     def update_effectiveness(

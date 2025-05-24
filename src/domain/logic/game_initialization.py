@@ -2,10 +2,12 @@ import random
 import uuid
 from typing import List
 from src.domain.models.game import Game, Platform, SessionId, TrustScore, SpreadRate
+from src.config.game_config import game_config
 
 class GameInitializationLogic:
-    PLATFORM_NAMES = ["Facebook", "Instagram", "Thread"]
-    AUDIENCE_TYPES = ["年輕族群", "中年族群", "老年族群"]
+    
+    def __init__(self):
+        self.config = game_config
     
     def create_new_game(self) -> Game:
         session_id = SessionId(f"game_{uuid.uuid4().hex}")
@@ -18,16 +20,16 @@ class GameInitializationLogic:
         )
     
     def _create_initial_platforms(self) -> List[Platform]:
-        audiences = self.AUDIENCE_TYPES.copy()
+        audiences = self.config.audience_types.copy()
         random.shuffle(audiences)
         
         return [
             Platform(
                 name=name,
                 audience=audience,
-                player_trust=TrustScore(50),
-                ai_trust=TrustScore(50),
-                spread_rate=SpreadRate(50)
+                player_trust=TrustScore(self.config.initial_player_trust),
+                ai_trust=TrustScore(self.config.initial_ai_trust),
+                spread_rate=SpreadRate(self.config.initial_spread_rate)
             )
-            for name, audience in zip(self.PLATFORM_NAMES, audiences)
+            for name, audience in zip(self.config.platform_names, audiences)
         ]

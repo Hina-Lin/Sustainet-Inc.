@@ -129,7 +129,7 @@ class GameStateManager:
                 platform_name=state.platform_name,
                 player_trust=state.player_trust,
                 ai_trust=state.ai_trust,
-                spread_rate=state.spread
+                spread_rate=state.spread_rate
             )
         
         # 4. 記錄工具使用
