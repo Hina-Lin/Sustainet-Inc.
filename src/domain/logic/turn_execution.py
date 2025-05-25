@@ -2,7 +2,7 @@
 回合執行邏輯 - 負責處理 AI 和玩家的行動執行
 """
 from typing import Dict, Any, Optional, List
-from src.application.dto.game_dto import ArticleMeta, ToolUsed, FakeNewsAgentResponse
+from src.application.dto.game_dto import ArticleMeta, ToolUsed, FakeNewsAgentResponse, SimulateCommentsRequest
 from src.domain.models.game import Game
 from src.utils.logger import logger
 
@@ -17,7 +17,8 @@ class TurnExecutionResult:
         article: ArticleMeta,
         target_platform: str,
         tools_used: List[ToolUsed],
-        agent_response: Optional[FakeNewsAgentResponse] = None
+        agent_response: Optional[FakeNewsAgentResponse] = None,
+        simulated_comments: Optional[List[str]] = None  
     ):
         self.actor = actor
         self.session_id = session_id
@@ -26,16 +27,18 @@ class TurnExecutionResult:
         self.target_platform = target_platform
         self.tools_used = tools_used
         self.agent_response = agent_response
+        self.simulated_comments = simulated_comments
 
 
 class TurnExecutionLogic:
     """回合執行邏輯 - Domain Layer"""
     
-    def __init__(self, ai_turn_logic, tool_repo, agent_factory, news_repo):
+    def __init__(self, ai_turn_logic, tool_repo, agent_factory, news_repo, simulate_comments_logic):
         self.ai_turn_logic = ai_turn_logic
         self.tool_repo = tool_repo
         self.agent_factory = agent_factory
         self.news_repo = news_repo
+        self.simulate_comments_logic = simulate_comments_logic
     
     def execute_actor_turn(
         self, 
@@ -119,6 +122,18 @@ class TurnExecutionLogic:
             "round_number": round_number
         })
         
+        # 產生模擬留言
+        sim_req = SimulateCommentsRequest(
+            session_id=session_id,
+            article=article,
+            actor="ai",
+            round_number=round_number,
+            platform=selected_platform.name,
+            audience=selected_platform.audience
+        )
+        sim_resp = self.simulate_comments_logic.generate_comments(sim_req)
+        simulated_comments = sim_resp.comments if sim_resp else []
+        
         return TurnExecutionResult(
             actor="ai",
             session_id=session_id,
@@ -126,7 +141,8 @@ class TurnExecutionLogic:
             article=article,
             target_platform=selected_platform.name,
             tools_used=tools_used,
-            agent_response=agent_output
+            agent_response=agent_output,
+            simulated_comments=simulated_comments
         )
     
     def _execute_player_action(
@@ -143,6 +159,7 @@ class TurnExecutionLogic:
         
         # 確保目標平台存在
         target_platform = article.target_platform
+        audience = None
         if not target_platform:
             available_platforms = [p.name for p in game.platforms]
             target_platform = available_platforms[0] if available_platforms else "Facebook"
@@ -150,10 +167,27 @@ class TurnExecutionLogic:
             
             logger.warning(f"Player article missing target_platform, defaulting to {target_platform}")
         
+        for p in game.platforms:
+            if p.name == target_platform:
+                audience = getattr(p, 'audience', None)
+                break
+            
         logger.info(f"Player used tools: {[t.tool_name for t in player_tools]}", extra={
             "session_id": session_id, 
             "round_number": round_number
         })
+        
+        # 產生模擬留言
+        sim_req = SimulateCommentsRequest(
+            session_id=session_id,
+            article=article,
+            actor="player",
+            round_number=round_number,
+            platform=target_platform,
+            audience=audience
+        )
+        sim_resp = self.simulate_comments_logic.generate_comments(sim_req)
+        simulated_comments = sim_resp.comments if sim_resp else []
         
         return TurnExecutionResult(
             actor="player",
@@ -161,5 +195,6 @@ class TurnExecutionLogic:
             round_number=round_number,
             article=article,
             target_platform=target_platform,
-            tools_used=player_tools
+            tools_used=player_tools,
+            simulated_comments=simulated_comments
         )

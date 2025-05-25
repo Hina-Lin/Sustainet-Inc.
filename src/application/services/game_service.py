@@ -15,6 +15,7 @@ from src.infrastructure.database.platform_state_repo import PlatformStateReposit
 from src.infrastructure.database.news_repo import NewsRepository
 from src.infrastructure.database.action_record_repo import ActionRecordRepository
 from src.infrastructure.database.game_round_repo import GameRoundRepository
+from src.infrastructure.database.article_polish_record_repo import ArticlePolishRecordRepository
 from src.domain.logic.agent_factory import AgentFactory
 from src.domain.logic.game_initialization import GameInitializationLogic
 from src.domain.logic.ai_turn import AiTurnLogic
@@ -37,6 +38,7 @@ from src.domain.logic.response_converter import ResponseConverter
 from src.domain.logic.tool_availability_logic import ToolAvailabilityLogic
 from src.domain.logic.game_end_logic import GameEndLogic
 from src.config.game_config import game_config
+from src.domain.logic.simulate_comments import SimulateCommentsLogic
         
 class GameService:
     def __init__(
@@ -49,6 +51,7 @@ class GameService:
         tool_repo: ToolRepository,
         tool_usage_repo: ToolUsageRepository,
         agent_factory: Optional[AgentFactory] = None,
+        polish_repo: Optional[ArticlePolishRecordRepository] = None
     ):
         self.setup_repo = setup_repo
         self.state_repo = state_repo
@@ -58,7 +61,8 @@ class GameService:
         self.agent_factory = agent_factory
         self.tool_repo = tool_repo
         self.tool_usage_repo = tool_usage_repo
-        
+        self.polish_repo = polish_repo
+
         # Domain logic instances
         self.game_init_logic = GameInitializationLogic()
         self.ai_turn_logic = AiTurnLogic()
@@ -66,14 +70,15 @@ class GameService:
         self.game_state_logic = GameStateLogic()
         self.player_action_logic = PlayerActionLogic()
         self.tool_effect_logic = ToolEffectLogic()
+        self.simulate_comments_logic = SimulateCommentsLogic(agent_factory)
         
         # New refactored components
         self.turn_execution_logic = TurnExecutionLogic(
-            self.ai_turn_logic, self.tool_repo, self.agent_factory, self.news_repo
+            self.ai_turn_logic, self.tool_repo, self.agent_factory, self.news_repo, self.simulate_comments_logic
         )
         self.game_state_manager = GameStateManager(
             setup_repo, state_repo, action_repo, tool_usage_repo,
-            self.game_state_logic, self.gm_logic, self.tool_effect_logic, self.agent_factory
+            self.game_state_logic, self.gm_logic, self.tool_effect_logic, self.agent_factory, polish_repo
         )
         self.tool_availability_logic = ToolAvailabilityLogic(tool_repo)
         self.response_converter = ResponseConverter(setup_repo, self.tool_availability_logic)

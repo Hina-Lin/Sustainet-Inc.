@@ -126,6 +126,7 @@ from src.infrastructure.database.action_record_repo import ActionRecordRepositor
 from src.infrastructure.database.game_round_repo import GameRoundRepository
 from src.infrastructure.database.tool_repo import ToolRepository
 from src.infrastructure.database.tool_usage_repo import ToolUsageRepository
+from src.infrastructure.database.article_polish_record_repo import ArticlePolishRecordRepository
 
 
 def get_agent_service(db: Session = Depends(get_db)) -> AgentService:
@@ -150,5 +151,6 @@ def get_game_service(db: Session = Depends(get_db), agent_factory: AgentFactory 
         round_repo=GameRoundRepository(),
         tool_repo=ToolRepository(),
         tool_usage_repo=ToolUsageRepository(),
-        agent_factory=agent_factory
+        agent_factory=agent_factory,
+        polish_repo=ArticlePolishRecordRepository()
     )

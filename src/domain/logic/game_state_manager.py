@@ -33,7 +33,8 @@ class GameStateManager:
         game_state_logic,
         gm_logic,
         tool_effect_logic,
-        agent_factory
+        agent_factory,
+        polish_repo
     ):
         self.setup_repo = setup_repo
         self.state_repo = state_repo
@@ -43,7 +44,8 @@ class GameStateManager:
         self.gm_logic = gm_logic
         self.tool_effect_logic = tool_effect_logic
         self.agent_factory = agent_factory
-    
+        self.polish_repo = polish_repo
+
     def rebuild_game_state(self, session_id: str, round_number: int):
         """重建遊戲狀態"""
         setup_data = self.setup_repo.get_by_session_id(session_id)
@@ -63,7 +65,8 @@ class GameStateManager:
             game, 
             turn_result.article, 
             turn_result.target_platform, 
-            turn_result.round_number
+            turn_result.round_number,
+            turn_result.simulated_comments
         )
         
         logger.debug(f"Original GM evaluation for {turn_result.actor}", extra={
@@ -108,9 +111,19 @@ class GameStateManager:
             round_number=turn_result.round_number,
             actor=turn_result.actor,
             platform=turn_result.target_platform,
-            content=turn_result.article.content
-        )
+            content=turn_result.article.content,
+            simulated_comments=turn_result.simulated_comments
+            )
         
+        # 紀錄潤飾前後的文章
+        if turn_result.article.polished_content:
+            self.polish_repo.create_polish_record(
+                session_id=turn_result.session_id,
+                round_number=turn_result.round_number,
+                original_content=turn_result.article.content,
+                polished_content=turn_result.article.polished_content
+            )
+
         # 2. 更新行動效果
         self.action_repo.update_effectiveness(
             action_id=action_record.id,
@@ -118,7 +131,6 @@ class GameStateManager:
             spread_change=gm_result.spread_change,
             reach_count=gm_result.reach_count,
             effectiveness=gm_result.effectiveness,
-            simulated_comments=gm_result.simulated_comments
         )
         
         # 3. 更新平台狀態
@@ -156,12 +168,12 @@ class GameStateManager:
         })
         
         return action_record.id
-    
-    def _get_gm_evaluation(self, game, article, target_platform, round_number) -> GameMasterAgentResponse:
+
+    def _get_gm_evaluation(self, game, article, target_platform, round_number, simulated_comments) -> GameMasterAgentResponse:
         """獲取 GM 評估"""
         target_platform_obj = game.get_platform(target_platform)
         variables = self.gm_logic.prepare_evaluation_variables(
-            article, target_platform_obj, game.platforms, round_number
+            article, target_platform_obj, game.platforms, round_number, simulated_comments
         )
         
         gm_response: GameMasterAgentResponse = self.agent_factory.run_agent_by_name(
