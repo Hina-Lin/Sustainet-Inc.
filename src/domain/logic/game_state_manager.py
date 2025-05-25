@@ -45,9 +45,6 @@ class GameStateManager:
         self.tool_effect_logic = tool_effect_logic
         self.agent_factory = agent_factory
         self.polish_repo = polish_repo
-        print("DEBUG polish_repo is:", polish_repo)
-        if polish_repo is None:
-            raise RuntimeError("polish_repo is None, check your DI chain")
 
     def rebuild_game_state(self, session_id: str, round_number: int):
         """重建遊戲狀態"""
