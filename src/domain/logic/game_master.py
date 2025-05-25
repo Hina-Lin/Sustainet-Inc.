@@ -8,7 +8,8 @@ class GameMasterLogic:
         article: ArticleMeta, 
         platform: Platform,
         all_platforms: List[Platform],
-        round_number: int
+        round_number: int,
+        simulated_comments: List[str]
     ) -> Dict[str, Any]:
         platform_summary = "\n".join([
             f"{p.name}（受眾：{p.audience}） | 玩家信任: {p.player_trust.value} | AI信任: {p.ai_trust.value} | 傳播率: {p.spread_rate.value}%"
@@ -28,7 +29,8 @@ class GameMasterLogic:
             "trust_multiplier": 1.0,
             "spread_multiplier": 1.0,
             "platform_state_summary": platform_summary,
-            "round_number": round_number
+            "round_number": round_number,
+            "simulated_comments": simulated_comments
         }
     
     def parse_gm_result(self, gm_result: Dict[str, Any]) -> Dict[str, Any]:

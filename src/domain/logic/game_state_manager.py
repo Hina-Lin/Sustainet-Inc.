@@ -63,7 +63,8 @@ class GameStateManager:
             game, 
             turn_result.article, 
             turn_result.target_platform, 
-            turn_result.round_number
+            turn_result.round_number,
+            turn_result.simulated_comments
         )
         
         logger.debug(f"Original GM evaluation for {turn_result.actor}", extra={
@@ -108,8 +109,9 @@ class GameStateManager:
             round_number=turn_result.round_number,
             actor=turn_result.actor,
             platform=turn_result.target_platform,
-            content=turn_result.article.content
-        )
+            content=turn_result.article.content,
+            simulated_comments=turn_result.simulated_comments
+            )
         
         # 2. 更新行動效果
         self.action_repo.update_effectiveness(
@@ -118,7 +120,6 @@ class GameStateManager:
             spread_change=gm_result.spread_change,
             reach_count=gm_result.reach_count,
             effectiveness=gm_result.effectiveness,
-            simulated_comments=gm_result.simulated_comments
         )
         
         # 3. 更新平台狀態
@@ -156,12 +157,12 @@ class GameStateManager:
         })
         
         return action_record.id
-    
-    def _get_gm_evaluation(self, game, article, target_platform, round_number) -> GameMasterAgentResponse:
+
+    def _get_gm_evaluation(self, game, article, target_platform, round_number, simulated_comments) -> GameMasterAgentResponse:
         """獲取 GM 評估"""
         target_platform_obj = game.get_platform(target_platform)
         variables = self.gm_logic.prepare_evaluation_variables(
-            article, target_platform_obj, game.platforms, round_number
+            article, target_platform_obj, game.platforms, round_number, simulated_comments
         )
         
         gm_response: GameMasterAgentResponse = self.agent_factory.run_agent_by_name(

@@ -37,6 +37,7 @@ from src.domain.logic.response_converter import ResponseConverter
 from src.domain.logic.tool_availability_logic import ToolAvailabilityLogic
 from src.domain.logic.game_end_logic import GameEndLogic
 from src.config.game_config import game_config
+from src.domain.logic.simulate_comments import SimulateCommentsLogic
         
 class GameService:
     def __init__(
@@ -66,10 +67,11 @@ class GameService:
         self.game_state_logic = GameStateLogic()
         self.player_action_logic = PlayerActionLogic()
         self.tool_effect_logic = ToolEffectLogic()
+        self.simulate_comments_logic = SimulateCommentsLogic(agent_factory)
         
         # New refactored components
         self.turn_execution_logic = TurnExecutionLogic(
-            self.ai_turn_logic, self.tool_repo, self.agent_factory, self.news_repo
+            self.ai_turn_logic, self.tool_repo, self.agent_factory, self.news_repo, self.simulate_comments_logic
         )
         self.game_state_manager = GameStateManager(
             setup_repo, state_repo, action_repo, tool_usage_repo,

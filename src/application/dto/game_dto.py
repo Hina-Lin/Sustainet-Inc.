@@ -426,3 +426,15 @@ class NewsPolishResponse(BaseModel):
                 "reasoning": "修改重點包括：加入吸引人的標題、使用更生動的描述語言、強調環保意識、突出成就感與使命感。"
             }
         }
+
+
+class SimulateCommentsRequest(BaseModel):
+    session_id: str = Field(..., description="遊戲 Session ID")
+    article: "ArticleMeta" = Field(..., description="要產生留言的新聞資料")
+    actor: str = Field(..., description="新聞發布者（ai/player）")
+    round_number: int = Field(..., description="回合數")
+    platform: str = Field(..., description="平台名稱")
+    audience: Optional[str] = Field(None, description="平台受眾")
+    
+class SimulateCommentsResponse(BaseModel):
+    comments: List[str] = Field(default_factory=list, description="產生的留言清單")
