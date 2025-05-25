@@ -33,7 +33,8 @@ class GameStateManager:
         game_state_logic,
         gm_logic,
         tool_effect_logic,
-        agent_factory
+        agent_factory,
+        polish_repo
     ):
         self.setup_repo = setup_repo
         self.state_repo = state_repo
@@ -43,7 +44,11 @@ class GameStateManager:
         self.gm_logic = gm_logic
         self.tool_effect_logic = tool_effect_logic
         self.agent_factory = agent_factory
-    
+        self.polish_repo = polish_repo
+        print("DEBUG polish_repo is:", polish_repo)
+        if polish_repo is None:
+            raise RuntimeError("polish_repo is None, check your DI chain")
+
     def rebuild_game_state(self, session_id: str, round_number: int):
         """重建遊戲狀態"""
         setup_data = self.setup_repo.get_by_session_id(session_id)
@@ -113,6 +118,15 @@ class GameStateManager:
             simulated_comments=turn_result.simulated_comments
             )
         
+        # 紀錄潤飾前後的文章
+        if turn_result.article.polished_content:
+            self.polish_repo.create_polish_record(
+                session_id=turn_result.session_id,
+                round_number=turn_result.round_number,
+                original_content=turn_result.article.content,
+                polished_content=turn_result.article.polished_content
+            )
+
         # 2. 更新行動效果
         self.action_repo.update_effectiveness(
             action_id=action_record.id,
