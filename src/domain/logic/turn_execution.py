@@ -84,25 +84,34 @@ class TurnExecutionLogic:
         # 獲取玩家歷史回應
         player_responses = self._get_player_responses(session_id, round_number)
         
-        # 準備變數（現在包含玩家歷史）
+        # 獲取並格式化 AI 可用工具
+        all_ai_tools_from_repo = self.tool_repo.list_tools_for_actor(actor="ai")
+        
+        # 根據當前回合數過濾工具
+        unlocked_ai_tools = [
+            tool for tool in all_ai_tools_from_repo
+            if round_number >= getattr(tool, 'available_from_round', 1) # 假設若無此屬性則預設第一回合可用
+        ]
+        
+        formatted_available_tools = [
+            {
+                "tool_name": tool.tool_name,
+                "description": tool.description
+                # 如果 AI Agent 的 prompt 需要 applicable_to，也可以在這裡加上
+                # "applicable_to": tool.applicable_to 
+            }
+            for tool in unlocked_ai_tools # 使用過濾後的工具列表
+        ]
+
+        # 準備變數（現在包含玩家歷史和格式化後的可用工具）
         variables = self.ai_turn_logic.prepare_fake_news_variables(
             platform=selected_platform, 
             news_1=news_1, 
             news_2=news_2,
             player_responses=player_responses,
-            current_round=round_number
+            current_round=round_number,
+            available_tools=formatted_available_tools # 傳遞格式化後的工具列表
         )
-        
-        # 添加可用工具
-        available_tools = self.tool_repo.list_tools_for_actor(actor="ai")
-        variables["available_tools"] = [
-            {
-                "tool_name": tool.tool_name,
-                "description": tool.description,
-                "applicable_to": tool.applicable_to
-            }
-            for tool in available_tools
-        ]
         
         # 調用 AI Agent
         agent_output: FakeNewsAgentResponse = self.agent_factory.run_agent_by_name(

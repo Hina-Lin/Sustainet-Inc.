@@ -14,7 +14,8 @@ class AiTurnLogic:
         news_1, 
         news_2, 
         player_responses: Optional[List[Dict[str, Any]]] = None,
-        current_round: int = 1
+        current_round: int = 1,
+        available_tools: Optional[List[Dict[str, Any]]] = None
     ):
         variables = {
             "news_1": news_1.content,
@@ -25,9 +26,9 @@ class AiTurnLogic:
             "target_audience": platform.audience,
             "current_round": current_round,
             "player_responses": player_responses,
-            "used_tool_descriptions": "無可用工具"
+            "available_tools": available_tools
         }
-        
+
         return variables
     
     def create_ai_article(self, result_data: FakeNewsAgentResponse, platform, source) -> ArticleMeta:

@@ -220,6 +220,7 @@ class GameService:
             round_number=round_number,
             article=article,
             player_tools=tool_used
+
         )
         
         # 3. 評估效果並應用工具
