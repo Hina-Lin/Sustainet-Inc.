@@ -627,25 +627,22 @@ class GameService:
         if not self.agent_factory:
             raise BusinessLogicError("系統未設定 Agent Factory")
         
-        variables = {"content": request.content, "requirements": request.requirements or "將文章潤色使其更吸引人、更有說服力"}
+        variables = {"content": request.content, 
+                     "requirements": request.requirements or "將文章潤色使其更吸引人、更有說服力",
+                     "sources": request.sources,
+                     "platform": request.platform}
         
         if request.sources:
             variables["sources"] = "\n".join(request.sources)
         if request.platform:
             variables["platform"] = request.platform
-        if request.platform_user:
-            variables["platform_user"] = request.platform_user
-        if request.current_situation:
-            variables["current_situation"] = request.current_situation
-        if request.additional_context:
-            variables.update(request.additional_context)
         
         try:
             result = self.agent_factory.run_agent_by_name(
                 session_id=request.session_id,
                 agent_name="news_polish_agent", 
                 variables=variables,
-                input_text="input_text"
+                input_text=request.requirements
             )
             
             if isinstance(result, dict):

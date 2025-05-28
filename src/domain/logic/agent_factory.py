@@ -15,6 +15,7 @@ from src.utils.logger import logger
 from src.config.settings import settings
 from src.infrastructure.database.agent_repo import AgentRepository
 from src.infrastructure.database.models.agent import Agent
+from src.infrastructure.database.session import get_storage
 
 import agno.tools as tools_pkg
 
@@ -77,6 +78,7 @@ class AgentFactory:
             agent_repo: Agent Repository 實例
         """
         self.agent_repo = agent_repo
+        self.storage = get_storage()
 
     def run_agent_by_name(self,
                          session_id: str,
@@ -108,6 +110,8 @@ class AgentFactory:
             if not agent:
                 raise ResourceNotFoundError(f"找不到名稱為 {agent_name} 的 Agent")
 
+            interal_session_id = f"{session_id}_{agent_name}"
+
             # 2. 處理變數替換
             if variables:
                 if agent.description:
@@ -116,7 +120,7 @@ class AgentFactory:
                     agent.instruction = VariablesRenderer.render_variables(agent.instruction, variables)
 
             # 3. 創建 Agent 實例
-            agent_instance = self._create_agent_from_data(session_id, agent, variables, response_model)
+            agent_instance = self._create_agent_from_data(interal_session_id, agent, variables, response_model)
             if not agent_instance:
                 raise BusinessLogicError("無法創建 Agent 實例")
 
@@ -205,7 +209,8 @@ class AgentFactory:
                 "tools": self._get_tools(agent.tools) if agent.tools else [],
                 "num_history_responses": agent.num_history_responses,
                 "markdown": agent.markdown,
-                "debug": agent.debug
+                "debug": agent.debug,
+                "add_history_to_messages": agent.add_history_to_messages
             }
 
             logger.debug(f"Agent 配置: {config}")
@@ -236,7 +241,9 @@ class AgentFactory:
                 num_history_responses=config["num_history_responses"],
                 markdown=config["markdown"],
                 # debug_mode=config["debug"]
-                debug_mode=True
+                debug_mode=True,
+                storage=self.storage,
+                add_history_to_messages=config["add_history_to_messages"]
             )
                 
             return agent_instance

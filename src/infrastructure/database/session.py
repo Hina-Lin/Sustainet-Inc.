@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
 from src.config import settings
+from agno.storage.postgres import PostgresStorage
 
 # Create synchronous engine
 engine = create_engine(
@@ -41,3 +42,17 @@ def get_db() -> Generator[Session, None, None]:
         raise
     finally:
         db.close()
+
+agent_storage = PostgresStorage(
+            db_url=settings.database_url_sync,
+            table_name="agent_session_history",
+            schema="public",
+            auto_upgrade_schema=True
+        )
+
+def get_storage():
+    """
+    提供資料庫存儲的依賴注入函數，
+    用於 FastAPI 中的 Depends 參數。
+    """
+    return agent_storage

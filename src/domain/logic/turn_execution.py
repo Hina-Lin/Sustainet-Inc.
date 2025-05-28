@@ -118,7 +118,7 @@ class TurnExecutionLogic:
             session_id=session_id,
             agent_name="fake_news_agent",
             variables=variables,
-            input_text="input_text",
+            input_text="N/A",
             response_model=FakeNewsAgentResponse
         )
         

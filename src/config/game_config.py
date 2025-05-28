@@ -31,7 +31,7 @@ class GameConfig:
     """
     
     # ===== 遊戲基本設定 =====
-    max_rounds: int = field(default_factory=lambda: int(os.getenv("GAME_MAX_ROUNDS", "2")))
+    max_rounds: int = field(default_factory=lambda: int(os.getenv("GAME_MAX_ROUNDS", "5")))
     win_trust_threshold: int = field(default_factory=lambda: int(os.getenv("GAME_WIN_TRUST_THRESHOLD", "100")))
     win_platform_count: int = field(default_factory=lambda: int(os.getenv("GAME_WIN_PLATFORM_COUNT", "3")))
     

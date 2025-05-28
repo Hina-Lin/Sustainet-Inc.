@@ -181,7 +181,7 @@ class GameStateManager:
             session_id=game.session_id.value,
             agent_name="game_master_agent",
             variables=variables,
-            input_text="input_text",
+            input_text="N/A",
             response_model=GameMasterAgentResponse
         )
         

@@ -401,9 +401,6 @@ class NewsPolishRequest(BaseModel):
     requirements: Optional[str] = Field(None, description="使用者的潤稿要求", max_length=4096)
     sources: Optional[List[str]] = Field(None, description="參考的新聞連結")
     platform: Optional[str] = Field(None, description="即將發布的平台")
-    platform_user: Optional[str] = Field(None, description="平台用戶名稱/特徵")
-    current_situation: Optional[str] = Field(None, description="當前狀況描述")
-    additional_context: Optional[Dict[str, Any]] = Field(None, description="其他上下文資訊")
 
 class NewsPolishResponse(BaseModel):
     """
