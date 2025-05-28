@@ -120,7 +120,10 @@ class AgentFactory:
                     agent.instruction = VariablesRenderer.render_variables(agent.instruction, variables)
 
             # 3. 創建 Agent 實例
-            agent_instance = self._create_agent_from_data(interal_session_id, agent, variables, response_model)
+            agent_instance = self._create_agent_from_data(session_id=interal_session_id, 
+                                                          agent=agent, 
+                                                          variables=variables, 
+                                                          response_model=response_model)
             if not agent_instance:
                 raise BusinessLogicError("無法創建 Agent 實例")
 
@@ -128,6 +131,11 @@ class AgentFactory:
             result = agent_instance.run(input_text)
             
             # 5. 處理結果
+            # 如果指定了 response_model，需要正確解析回應
+            if response_model:
+                return result.content
+            
+            # 否則返回字符串內容
             if hasattr(result, 'content'):
                 content = result.content
             else:
@@ -214,7 +222,6 @@ class AgentFactory:
             }
 
             logger.debug(f"Agent 配置: {config}")
-            
             # 2. 處理變數替換
             if variables:
                 if config["description"]:

@@ -43,7 +43,7 @@ class SimulateCommentsLogic:
         return SimulateCommentsResponse(comments=[])
 
     def generate_comments(
-        self, request: SimulateCommentsRequest, input_text: str = "input_text"
+        self, request: SimulateCommentsRequest, input_text: str = "N/A"
     ) -> SimulateCommentsResponse:
         variables = self.prepare_simulate_comments_variables(request)
         result = self.agent_factory.run_agent_by_name(

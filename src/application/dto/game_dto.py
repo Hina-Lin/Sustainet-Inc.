@@ -162,7 +162,7 @@ class ArticleMeta(BaseModel):
     image_url: Optional[str] = Field(None, description="配圖連結")
     source: Optional[str] = Field(None, description="新聞來源")
     author: str = Field(..., description="發文者名稱，ai 或 玩家名稱")
-    published_date: str = Field(..., description="發布時間，例如 2024-05-18T15:30:00")
+    published_date: str = Field(..., description="發布時間，例如 2025-05-29 14:30:15")
     target_platform: Optional[str] = Field(None, description="文章發佈的平台（AI 回合不顯示）")
     requirement: Optional[str] = Field(None, description="語氣或風格需求（如有）")
     veracity: Optional[str] = Field(None, description="AI 生成文章的真實性，由 AI 或 GM 判定")
@@ -176,7 +176,7 @@ class ArticleMeta(BaseModel):
                 "image_url": "https://img.server/image1.jpg",
                 "source": "聯合報",
                 "author": "ai",
-                "published_date": "2025-05-21T14:45:00",
+                "published_date": "2025-05-21 14:45:00",
                 "target_platform": "Instagram",
                 "requirement": "強調危機感、簡明易懂",
                 "veracity": "partial"
@@ -250,10 +250,7 @@ class GameMasterAgentResponse(BaseModel):
                     {"platform_name": "Facebook", "player_trust": 40, "ai_trust": 60, "spread_rate": 75},
                     {"platform_name": "Instagram", "player_trust": 50, "ai_trust": 50, "spread_rate": 50}
                 ],
-                "effectiveness": "high",
-                "simulated_comments": [
-                    "這太誇張了吧！", "消息來源可靠嗎？", "已轉發，大家注意！"
-                ]
+                "effectiveness": "high"
             }
         }
 
@@ -290,7 +287,7 @@ class BaseRoundResponse(BaseModel):
                     "title": "大雨致水災 民生受影響",
                     "content": "昨夜連續暴雨導致多區域淹水，專家呼籲儘速檢討排水政策...",
                     "author": "player1",
-                    "published_date": "2025-05-22T08:00:00"
+                    "published_date": "2025-05-22 08:00:00"
                 },
                 "trust_change": 8,
                 "reach_count": 12345,

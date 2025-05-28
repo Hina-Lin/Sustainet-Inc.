@@ -39,7 +39,7 @@ class AiTurnLogic:
             image_url=result_data.image_url,
             source=source,
             author="ai",
-            published_date=datetime.now().isoformat(),
+            published_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             target_platform=platform.name,
             requirement=None,
             veracity=result_data.veracity

@@ -57,7 +57,7 @@ class ResponseConverter:
             "tool_used": turn_result.tools_used,
             "tool_list": tool_list,
             "effectiveness": gm_result.effectiveness,
-            "simulated_comments": gm_result.simulated_comments
+            "simulated_comments": turn_result.simulated_comments
         }
         
         # 添加遊戲結束信息（如果有的話）

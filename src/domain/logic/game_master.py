@@ -39,7 +39,6 @@ class GameMasterLogic:
             "reach_count": gm_result.get("reach_count", 0),
             "spread_change": gm_result.get("spread_change", 0),
             "effectiveness": gm_result.get("effectiveness", "medium"),
-            "simulated_comments": gm_result.get("simulated_comments", []),
             "platform_status": gm_result.get("platform_status", [])
         }
     

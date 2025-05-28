@@ -96,9 +96,9 @@ class TurnExecutionLogic:
         formatted_available_tools = [
             {
                 "tool_name": tool.tool_name,
-                "description": tool.description
-                # 如果 AI Agent 的 prompt 需要 applicable_to，也可以在這裡加上
-                # "applicable_to": tool.applicable_to 
+                "description": tool.description,
+                "trust_effect": tool.effects.trust_multiplier,
+                "spread_effect": tool.effects.spread_multiplier
             }
             for tool in unlocked_ai_tools # 使用過濾後的工具列表
         ]
