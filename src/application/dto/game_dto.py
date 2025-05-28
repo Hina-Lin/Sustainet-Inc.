@@ -239,7 +239,6 @@ class GameMasterAgentResponse(BaseModel):
     reach_count: int = Field(..., description="本回合目標平台觸及人數")
     platform_status: List[GameMasterAgentPlatformStatus] = Field(..., description="各平台最新狀態")
     effectiveness: str = Field(..., description="行動有效性 (low, medium, high)")
-    simulated_comments: List[str] = Field(..., description="模擬的社群評論")
 
     class Config:
         json_schema_extra = {
