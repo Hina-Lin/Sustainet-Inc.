@@ -74,7 +74,7 @@ class GameService:
         
         # New refactored components
         self.turn_execution_logic = TurnExecutionLogic(
-            self.ai_turn_logic, self.tool_repo, self.agent_factory, self.news_repo, self.simulate_comments_logic
+            self.ai_turn_logic, self.tool_repo, self.agent_factory, self.news_repo, self.simulate_comments_logic, self.action_repo
         )
         self.game_state_manager = GameStateManager(
             setup_repo, state_repo, action_repo, tool_usage_repo,

@@ -33,12 +33,13 @@ class TurnExecutionResult:
 class TurnExecutionLogic:
     """回合執行邏輯 - Domain Layer"""
     
-    def __init__(self, ai_turn_logic, tool_repo, agent_factory, news_repo, simulate_comments_logic):
+    def __init__(self, ai_turn_logic, tool_repo, agent_factory, news_repo, simulate_comments_logic, action_repo):
         self.ai_turn_logic = ai_turn_logic
         self.tool_repo = tool_repo
         self.agent_factory = agent_factory
         self.news_repo = news_repo
         self.simulate_comments_logic = simulate_comments_logic
+        self.action_repo = action_repo  # 新增：用於獲取玩家歷史回應
     
     def execute_actor_turn(
         self, 
@@ -80,11 +81,16 @@ class TurnExecutionLogic:
         news_1 = self.news_repo.get_random_active_news()
         news_2 = self.news_repo.get_random_active_news()
         
-        # 準備變數
+        # 獲取玩家歷史回應
+        player_responses = self._get_player_responses(session_id, round_number)
+        
+        # 準備變數（現在包含玩家歷史）
         variables = self.ai_turn_logic.prepare_fake_news_variables(
             platform=selected_platform, 
             news_1=news_1, 
-            news_2=news_2
+            news_2=news_2,
+            player_responses=player_responses,
+            current_round=round_number
         )
         
         # 添加可用工具
@@ -198,3 +204,56 @@ class TurnExecutionLogic:
             tools_used=player_tools,
             simulated_comments=simulated_comments
         )
+    
+    def _get_player_responses(self, session_id: str, current_round: int) -> List[Dict[str, Any]]:
+        """
+        獲取玩家的歷史回應記錄
+        
+        Args:
+            session_id: 遊戲會話ID
+            current_round: 當前回合數
+            
+        Returns:
+            玩家回應記錄列表
+        """
+        try:
+            # 獲取當前回合之前的所有玩家行動
+            player_actions = self.action_repo.get_player_actions_before_round(
+                session_id=session_id,
+                before_round=current_round
+            )
+            
+            if not player_actions:
+                logger.info(f"No player responses found for session {session_id} before round {current_round}")
+                return []
+            
+            # 轉換為字典格式
+            responses = []
+            for action in player_actions:
+                response_dict = {
+                    'round_number': action.round_number,
+                    'platform': action.platform,
+                    'title': action.title,
+                    'content': action.content,
+                    'effectiveness': action.effectiveness,
+                    'trust_change': action.trust_change,
+                    'spread_change': action.spread_change,
+                    'reach_count': action.reach_count,
+                    'simulated_comments': action.simulated_comments if action.simulated_comments else []
+                }
+                responses.append(response_dict)
+            
+            logger.info(f"Retrieved {len(responses)} player responses for AI analysis", extra={
+                "session_id": session_id,
+                "current_round": current_round,
+                "player_responses_count": len(responses)
+            })
+            
+            return responses
+            
+        except Exception as e:
+            logger.error(f"Failed to retrieve player responses: {str(e)}", extra={
+                "session_id": session_id,
+                "current_round": current_round
+            })
+            return []

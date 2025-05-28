@@ -111,6 +111,7 @@ class GameStateManager:
             round_number=turn_result.round_number,
             actor=turn_result.actor,
             platform=turn_result.target_platform,
+            title=turn_result.article.title,
             content=turn_result.article.content,
             simulated_comments=turn_result.simulated_comments
             )

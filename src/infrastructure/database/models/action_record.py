@@ -15,6 +15,7 @@ class ActionRecord(Base, TimeStampMixin):
     - **round_number**: 回合編號。
     - **actor**: 行動者（"player" 或 "ai"）。
     - **platform**: 所使用的平台（如 "Facebook"）。
+    - **title**: 文章標題。
     - **content**: 發布的文字內容。
     - **reach_count**: 預估觸及人數。
     - **trust_change**: 此次行動造成的信任值變化。
@@ -60,6 +61,12 @@ class ActionRecord(Base, TimeStampMixin):
         String(32),
         nullable=False,
         comment="發布平台名稱（如 Facebook、Twitter）"
+    )
+
+    title = Column(
+        String(255),
+        nullable=True,
+        comment="文章標題"
     )
 
     content = Column(

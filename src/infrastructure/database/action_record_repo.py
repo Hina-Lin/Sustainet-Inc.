@@ -108,6 +108,7 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
         round_number: int,
         actor: str,
         platform: str,
+        title: str,
         content: str,
         reach_count: Optional[int] = None,
         trust_change: Optional[int] = None,
@@ -141,6 +142,7 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
                 "round_number": round_number,
                 "actor": actor,
                 "platform": platform,
+                "title": title,
                 "content": content,
                 "reach_count": reach_count,
                 "trust_change": trust_change,
@@ -194,3 +196,32 @@ class ActionRecordRepository(BaseRepository[ActionRecord]):
             action.simulated_comments = simulated_comments
 
         db.commit()
+    
+    @with_session
+    def get_player_actions_before_round(
+        self,
+        session_id: str,
+        before_round: int,
+        db: Optional[Session] = None
+    ) -> List[ActionRecord]:
+        """
+        獲取指定回合之前的所有玩家行動記錄
+        
+        Args:
+            session_id: 遊戲會話ID
+            before_round: 獲取此回合之前的記錄
+            db: 數據庫會話
+            
+        Returns:
+            玩家行動記錄列表，按回合數排序
+        """
+        return (
+            db.query(self.model)
+            .filter(
+                self.model.session_id == session_id,
+                self.model.actor == "player",
+                self.model.round_number < before_round
+            )
+            .order_by(self.model.round_number.asc())
+            .all()
+        )
