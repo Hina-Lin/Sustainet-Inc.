@@ -560,9 +560,9 @@ class GameService:
                 "trust_change": ai_action.trust_change or 0
             }
             
-            # 社群反應（只取前2個）
+            # 社群反應
             if ai_action.simulated_comments:
-                info["social_reactions"] = ai_action.simulated_comments[:2]
+                info["social_reactions"] = ai_action.simulated_comments[:3]
         
         # 玩家回應簡化信息
         if player_action:
