@@ -45,13 +45,13 @@ class AiTurnLogic:
 
         return variables
     
-    def create_ai_article(self, result_data: FakeNewsAgentResponse, source) -> ArticleMeta:
+    def create_ai_article(self, result_data: FakeNewsAgentResponse) -> ArticleMeta:
         return ArticleMeta(
             title=result_data.title,
             content=result_data.content,
             polished_content=None,
             image_url=result_data.image_url,
-            source=source,
+            source=result_data.source,  # 使用Agent生成的source
             author="ai",
             published_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             target_platform=getattr(result_data, 'target_platform', None),  # Agent現在會返回選擇的平台

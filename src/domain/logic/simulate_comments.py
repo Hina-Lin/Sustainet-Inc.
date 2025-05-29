@@ -17,6 +17,8 @@ class SimulateCommentsLogic:
         variables = {
             "title": request.article.title,
             "content": content,
+            "source": request.article.source,  # 新增：新聞來源
+            "image_url": request.article.image_url,  # 新增：圖片URL
             "platform": request.platform,
             "audience": request.audience,
             "actor": request.actor,

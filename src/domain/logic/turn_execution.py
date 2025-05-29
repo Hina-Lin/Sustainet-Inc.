@@ -129,10 +129,10 @@ class TurnExecutionLogic:
             agent_output.target_platform
         )
         
-        # 創建文章
+        # 創建文章（使用Agent生成的source，不要被真實新聞的source覆蓋）
         article = self.ai_turn_logic.create_ai_article(
-            result_data=agent_output,
-            source=news_1.source
+            result_data=agent_output
+            # 移除 source=news_1.source，讓Agent自己決定 source
         )
         
         # 解析 AI 使用的工具

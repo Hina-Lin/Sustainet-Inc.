@@ -34,7 +34,11 @@ class ResponseConverter:
         article_safe = self._create_safe_article(turn_result.article, turn_result.actor)
         
         # 轉換平台狀態
-        platform_status_objs = self._convert_platform_status(gm_result.platform_status)
+        platform_status_objs = self._convert_platform_status(
+            gm_result.platform_status, 
+            turn_result.session_id, 
+            turn_result.round_number
+        )
         
         # 根據回合數獲取可用工具列表（如果沒有提供的話）
         if tool_list is None:
@@ -78,9 +82,12 @@ class ResponseConverter:
         article_dict = article.model_dump()
         return ArticleMeta.model_validate(article_dict)
     
-    def _convert_platform_status(self, platform_status_list) -> List[Dict[str, Any]]:
+    def _convert_platform_status(self, platform_status_list, session_id: str, round_number: int) -> List[Dict[str, Any]]:
+        """轉換平台狀態列表"""
         return [
             PlatformStatus(
+                session_id=session_id,  # 新增：傳遞session_id
+                round_number=round_number,  # 新增：傳遞round_number
                 platform_name=ps.platform_name,
                 player_trust=ps.player_trust,
                 ai_trust=ps.ai_trust,
