@@ -201,6 +201,7 @@ class ToolUsed(BaseModel):
 class FakeNewsAgentResponse(BaseModel):
     title: str = Field(..., description="Agent生成的新聞標題")
     content: str = Field(..., description="Agent生成的新聞內容")
+    target_platform: str = Field(..., description="Agent選擇的目標平台")
     image_url: Optional[str] = Field(None, description="Agent生成的圖片URL（可選）")
     source: str = Field(..., description="Agent創造的新聞來源")
     veracity: str = Field(..., description="Agent判定的新聞真實性 (false, partial, true)")

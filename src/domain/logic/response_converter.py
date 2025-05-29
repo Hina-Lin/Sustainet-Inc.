@@ -75,20 +75,10 @@ class ResponseConverter:
             return PlayerTurnResponse(**response_dict)
     
     def _create_safe_article(self, article: ArticleMeta, actor: str) -> ArticleMeta:
-        """創建安全的文章副本（移除敏感信息）"""
         article_dict = article.model_dump()
-        
-        # 移除真實性信息
-        article_dict["veracity"] = None
-        
-        # AI 回合不顯示目標平台
-        if actor == "ai":
-            article_dict["target_platform"] = None
-        
         return ArticleMeta.model_validate(article_dict)
     
     def _convert_platform_status(self, platform_status_list) -> List[Dict[str, Any]]:
-        """轉換平台狀態列表"""
         return [
             PlatformStatus(
                 platform_name=ps.platform_name,

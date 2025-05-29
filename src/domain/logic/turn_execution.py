@@ -74,15 +74,15 @@ class TurnExecutionLogic:
         round_number: int
     ) -> TurnExecutionResult:
         """執行 AI 行動"""
-        # 選擇平台
-        selected_platform = self.ai_turn_logic.select_platform(game.platforms)
-        
         # 獲取新聞來源
         news_1 = self.news_repo.get_random_active_news()
         news_2 = self.news_repo.get_random_active_news()
         
         # 獲取玩家歷史回應
         player_responses = self._get_player_responses(session_id, round_number)
+        
+        # 獲取AI上一回合的群眾反應
+        ai_previous_feedback = self._get_ai_previous_round_feedback(session_id, round_number)
         
         # 獲取並格式化 AI 可用工具
         all_ai_tools_from_repo = self.tool_repo.list_tools_for_actor(actor="ai")
@@ -103,14 +103,15 @@ class TurnExecutionLogic:
             for tool in unlocked_ai_tools # 使用過濾後的工具列表
         ]
 
-        # 準備變數（現在包含玩家歷史和格式化後的可用工具）
+        # 準備變數（包含所有平台信息讓Agent自己選擇）
         variables = self.ai_turn_logic.prepare_fake_news_variables(
-            platform=selected_platform, 
+            all_platforms=game.platforms,  # 傳遞所有平台信息
             news_1=news_1, 
             news_2=news_2,
             player_responses=player_responses,
+            ai_previous_feedback=ai_previous_feedback,  # 新增：傳遞AI上一回合的群眾反應
             current_round=round_number,
-            available_tools=formatted_available_tools # 傳遞格式化後的工具列表
+            available_tools=formatted_available_tools
         )
         
         # 調用 AI Agent
@@ -122,10 +123,15 @@ class TurnExecutionLogic:
             response_model=FakeNewsAgentResponse
         )
         
+        # 根據Agent選擇的平台獲取平台對象
+        selected_platform = self.ai_turn_logic.get_platform_by_name(
+            game.platforms, 
+            agent_output.target_platform
+        )
+        
         # 創建文章
         article = self.ai_turn_logic.create_ai_article(
             result_data=agent_output,
-            platform=selected_platform,
             source=news_1.source
         )
         
@@ -266,3 +272,63 @@ class TurnExecutionLogic:
                 "current_round": current_round
             })
             return []
+    
+    def _get_ai_previous_round_feedback(self, session_id: str, current_round: int) -> Dict[str, Any]:
+        """
+        獲取AI上一回合發布內容的群眾反應（簡化版）
+        
+        Args:
+            session_id: 遊戲會話ID
+            current_round: 當前回合數
+            
+        Returns:
+            AI上一回合的效果和群眾反應（簡化版）
+        """
+        try:
+            if current_round <= 1:
+                logger.info(f"No previous AI round for session {session_id} at round {current_round}")
+                return {}
+            
+            # 獲取上一回合AI的行動
+            previous_round = current_round - 1
+            ai_actions = self.action_repo.get_actions_by_session_and_round(
+                session_id=session_id,
+                round_number=previous_round
+            )
+            
+            # 找到AI的行動
+            ai_action = None
+            for action in ai_actions:
+                if action.actor == "ai":
+                    ai_action = action
+                    break
+            
+            if not ai_action:
+                logger.info(f"No AI action found for session {session_id} round {previous_round}")
+                return {}
+            
+            # 構建簡化的上一回合反饋信息（只包含必要信息）
+            feedback = {
+                'previous_round': previous_round,
+                'previous_effectiveness': ai_action.effectiveness,
+                'previous_trust_change': ai_action.trust_change,
+                'previous_spread_change': ai_action.spread_change,
+                'previous_reach_count': ai_action.reach_count,
+                'crowd_reactions': ai_action.simulated_comments if ai_action.simulated_comments else []
+            }
+            
+            logger.info(f"Retrieved simplified AI previous round feedback for session {session_id}", extra={
+                "session_id": session_id,
+                "current_round": current_round,
+                "previous_round": previous_round,
+                "reactions_count": len(feedback['crowd_reactions'])
+            })
+            
+            return feedback
+            
+        except Exception as e:
+            logger.error(f"Failed to retrieve AI previous round feedback: {str(e)}", extra={
+                "session_id": session_id,
+                "current_round": current_round
+            })
+            return {}

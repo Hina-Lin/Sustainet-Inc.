@@ -87,6 +87,7 @@ class GameService:
     def start_game(self, request: Optional[GameStartRequest] = None) -> GameStartResponse:
         # Create new game using domain logic
         game = self.game_init_logic.create_new_game()
+        logger.info(f"Game created: {game}")
         
         # Save to database
         platforms_data = self.game_state_logic.convert_platforms_to_db_format(game.platforms)
